@@ -1,2 +1,10 @@
-datasets/*
-!datasets/*.zip
+datasets/faces_v_obj/
+datasets/fragments/
+datasets/plates/
+datasets/silhouettes/
+datasets/faces_v_obj.zip
+interpreter
+.idea
+.venv
+.vscode
+__pycache__
