@@ -54,9 +54,9 @@ class HealthyPlatesExperiment:
         return metrics, hex_contrast_acc
 
     def compute_metrics(self, inputs, targets, is_test=False, hexes=None, contrasts=None, hex_contrast_acc=None):
-        output = self.model(inputs).flatten()
+        output = self.model(inputs)
         loss = self.criterion(output, targets)
-        _, predicted = torch.max(output, 1)
+        _, predicted = torch.argmax(output, 1)
         bacc = balanced_accuracy_score(targets.cpu().numpy(), predicted.detach().cpu().numpy())
 
         if is_test:
