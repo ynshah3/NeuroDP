@@ -1,4 +1,3 @@
-import sys
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
 from torch.utils.data import Subset, DataLoader
@@ -8,14 +7,7 @@ from file_utils import *
 from visualize import CONTRAST_VALUES, HEX_VALUES, visualize_hex_contrasts
 
 
-if __name__ == '__main__':
-    """
-    Hyperparameter Tuning: 
-    python3 main.py <config_name> [param1] [comma_sep_values]
-    E.g. python3 main.py healthy_plates lr 0.0001,0.00001
-    """
-    config_name, param, values = sys.argv[1:]
-    args = read_file_in_dir('configs/', config_name + '.json')
+def healthy_plates_main(args, param, values):
     dpath_parent = 'runs/' + args["name"] + '/' + param + '/'
 
     runs = args['runs']
@@ -30,7 +22,7 @@ if __name__ == '__main__':
         hca_runs = []
 
         for run in range(runs):
-            print(f'\trun #{run + 1}\n-------')
+            print(f'\trun #{run + 1}\n\t-------')
 
             fpath_val_loss = dpath + str(run) + '_val_loss.txt'
             fpath_val_bacc = dpath + str(run) + '_val_bacc.txt'
@@ -38,7 +30,7 @@ if __name__ == '__main__':
             hca_run = np.zeros((len(CONTRAST_VALUES), len(HEX_VALUES)), dtype=int)
 
             train_dataset, test_dataset = plates_dataset('./datasets/plates/')
-            train_labels = [label for _, label, _ in train_dataset]
+            train_labels = [label for _, label in train_dataset]
             skf = StratifiedKFold(n_splits=5, shuffle=True)
 
             fold = 0

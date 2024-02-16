@@ -33,8 +33,7 @@ class HealthyPlatesExperiment:
             lr=args['lr'],
             weight_decay=args['weight_decay'],
             betas=(args['beta1'], args['beta2']),
-            eps=args['eps'],
-            amsgrad=args['amsgrad']
+            eps=args['eps']
         )
         self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.epochs)
 
@@ -72,7 +71,7 @@ class HealthyPlatesExperiment:
     def train(self, loader):
         self.model.train()
 
-        for inputs, targets, _ in loader:
+        for inputs, targets in loader:
             inputs, targets = inputs.to(self.device), targets.to(self.device)
 
             self.optimizer.zero_grad()
