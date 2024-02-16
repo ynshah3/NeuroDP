@@ -16,7 +16,7 @@ if __name__ == '__main__':
     """
     config_name, param, values = sys.argv[1:]
     args = read_file_in_dir('configs/', config_name + '.json')
-    dpath = 'runs/' + args["name"] + '/' + param + '/'
+    dpath_parent = 'runs/' + args["name"] + '/' + param + '/'
 
     runs = args['runs']
     for value in np.array(values.split(',')).astype(float):
@@ -24,7 +24,7 @@ if __name__ == '__main__':
         args[param] = value.item()
         print(hparams)
 
-        dpath += str(value) + '/'
+        dpath = dpath_parent + str(value) + '/'
         os.makedirs(dpath, exist_ok=True)
 
         hca_runs = []
