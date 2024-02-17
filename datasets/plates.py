@@ -29,7 +29,7 @@ def plates_dataset(image_dir='./datasets/plates/'):
     transform = v2.Compose([
         v2.Resize((224, 224)),
         v2.PILToTensor(),
-        v2.ToDtype(torch.float32, scale=True)
+        v2.ToDtype(torch.float32)
     ])
 
     train_dataset = ImageFolder(root=image_dir + 'train/', transform=transform)

@@ -35,7 +35,7 @@ class HealthyPlatesExperiment:
             betas=(args['beta1'], args['beta2']),
             eps=args['eps']
         )
-        self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.epochs)
+        self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.epochs*2)
 
     def run(self, train_loader, val_loader, test_loader):
         metrics = {'val_loss': [], 'val_bacc': []}
@@ -63,7 +63,7 @@ class HealthyPlatesExperiment:
             for i in range(len(predicted)):
                 contrast_index = CONTRAST_VALUES.index(contrasts[i])
                 hex_index = HEX_VALUES.index(hexes[i])
-                if predicted == targets[i]:
+                if predicted[i] == targets[i]:
                     hex_contrast_acc[contrast_index][hex_index] += 1
 
         return loss, bacc, hex_contrast_acc
@@ -89,28 +89,34 @@ class HealthyPlatesExperiment:
         hex_contrast_acc = np.zeros((len(CONTRAST_VALUES), len(HEX_VALUES)))
 
         with torch.no_grad():
-            for inputs, targets, (hexes, contrasts) in loader:
-                inputs, targets = inputs.to(self.device), targets.to(self.device)
-
                 if is_val:
-                    loss, b_acc, _ = self.compute_metrics(
-                        inputs=inputs,
-                        targets=targets,
-                        is_test=False
-                    )
-                else:
-                    loss, b_acc, hex_contrast_acc = self.compute_metrics(
-                        inputs=inputs,
-                        targets=targets,
-                        is_test=False,
-                        hexes=hexes,
-                        contrasts=contrasts,
-                        hex_contrast_acc=hex_contrast_acc
-                    )
+                    for inputs, targets in loader:
+                        inputs, targets = inputs.to(self.device), targets.to(self.device)
 
-                test_loss += loss
-                test_bacc += b_acc
+                        loss, b_acc, _ = self.compute_metrics(
+                            inputs=inputs,
+                            targets=targets,
+                            is_test=False
+                        )
+
+                        test_loss += loss
+                        test_bacc += b_acc
+                else:
+                    for inputs, targets, (hexes, contrasts) in loader:
+                        inputs, targets = inputs.to(self.device), targets.to(self.device)
+
+                        loss, b_acc, hex_contrast_acc = self.compute_metrics(
+                            inputs=inputs,
+                            targets=targets,
+                            is_test=True,
+                            hexes=hexes,
+                            contrasts=contrasts,
+                            hex_contrast_acc=hex_contrast_acc
+                        )
+
+                        test_loss += loss
+                        test_bacc += b_acc
 
         return test_loss.detach().cpu().item() / len(loader), \
-            test_bacc / len(loader), \
-            hex_contrast_acc / len(loader.dataset)
+            test_bacc / len(loader.dataset), \
+            hex_contrast_acc / 20

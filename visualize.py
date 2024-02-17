@@ -28,30 +28,29 @@ def visualize_hex_contrasts(hca_runs, save_path):
     bounds = np.arange(num_colors + 1)
     norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
-    # Create a figure and axis
-    fig, ax = plt.subplots(figsize=(10, 6))
-
     # Plot each curve for different contrast levels
     for i, contrast_value in enumerate(CONTRAST_NAMES):
+        # Create a figure and axis
+        fig, ax = plt.subplots()
+
         flierprops = dict(marker=markers[i], linestyle=linestyles[i], color=colors[i])
         medianprops = dict(linewidth=1.5, color='black')
         plt.boxplot(hca_runs[i], flierprops=flierprops, medianprops=medianprops)
-        means = np.mean(hca_runs[i], axis=0)
-        plt.plot(np.arange(1, 13), means, label=contrast_value, ls=linestyles[i], color=colors[i])
 
-    colorbar = ax.figure.colorbar(ScalarMappable(cmap=cmap, norm=norm), ax=ax, orientation='horizontal',
-                                  fraction=0.1, pad=0.02)
-    colorbar.set_ticks(np.arange(num_colors) + 0.5)
-    colorbar.set_ticklabels(['R', 'RO', 'O', 'YO', 'Y', 'YG', 'G', 'BG', 'B', 'BV', 'V', 'RV'])
-    plt.xticks([])
-    plt.ylabel('Balanced Accuracy')
+        colorbar = ax.figure.colorbar(ScalarMappable(cmap=cmap, norm=norm), ax=ax, orientation='horizontal',
+                fraction=0.1, pad=0.02)
+        colorbar.set_ticks(np.arange(num_colors) + 0.5)
+        colorbar.set_ticklabels(['R', 'RO', 'O', 'YO', 'Y', 'YG', 'G', 'BG', 'B', 'BV', 'V', 'RV'])
+        plt.xticks([])
+        plt.yticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+        plt.ylabel('Accuracy')
 
-    box = ax.get_position()
-    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
-    plt.legend(title='Bg-Fg contrast diff.', loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.tight_layout()
-    plt.savefig(save_path, bbox_inches='tight')
+        # plt.legend(title='Bg-Fg contrast diff.', loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.tight_layout()
+        plt.savefig(save_path + '_' + str(i) + '.png', bbox_inches='tight')
 
 
 if __name__ == '__main__':
