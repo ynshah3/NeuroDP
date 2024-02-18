@@ -38,9 +38,9 @@ def healthy_plates_main(args, param, values):
                 train_dataset = Subset(train_val_dataset, train_idx)
                 val_dataset = Subset(train_val_dataset, val_idx)
 
-                train_loader = DataLoader(train_dataset, batch_size=args['bz'], num_workers=args['num_workers'], shuffle=True)
-                val_loader = DataLoader(val_dataset, batch_size=args['bz'], num_workers=args['num_workers'], shuffle=False)
-                test_loader = DataLoader(test_dataset, batch_size=args['bz'], num_workers=args['num_workers'], shuffle=False)
+                train_loader = DataLoader(train_dataset, batch_size=int(args['bz']), num_workers=args['num_workers'], shuffle=True)
+                val_loader = DataLoader(val_dataset, batch_size=int(args['bz']), num_workers=args['num_workers'], shuffle=False)
+                test_loader = DataLoader(test_dataset, batch_size=int(args['bz']), num_workers=args['num_workers'], shuffle=False)
 
                 print('\t\tFold %d' % fold)
 

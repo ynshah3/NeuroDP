@@ -34,7 +34,7 @@ def visualize_hex_contrasts(hca_runs, save_path):
         fig, ax = plt.subplots()
 
         flierprops = dict(marker=markers[i], linestyle=linestyles[i], color=colors[i])
-        medianprops = dict(linewidth=1.5, color='black')
+        medianprops = dict(linewidth=1.5, color=colors[i])
         plt.boxplot(hca_runs[i], flierprops=flierprops, medianprops=medianprops)
 
         colorbar = ax.figure.colorbar(ScalarMappable(cmap=cmap, norm=norm), ax=ax, orientation='horizontal',

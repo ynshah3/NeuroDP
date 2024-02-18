@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from sklearn.metrics import balanced_accuracy_score
 from torchvision.models import resnet18, ResNet18_Weights
 from visualize import HEX_VALUES, CONTRAST_VALUES
 
@@ -35,7 +34,7 @@ class HealthyPlatesExperiment:
             betas=(args['beta1'], args['beta2']),
             eps=args['eps']
         )
-        self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.epochs*2)
+        self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.epochs)
 
     def run(self, train_loader, val_loader, test_loader):
         metrics = {'val_loss': [], 'val_bacc': []}
