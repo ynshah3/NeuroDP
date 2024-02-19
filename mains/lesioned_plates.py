@@ -47,8 +47,8 @@ def lesioned_plates_main(args, param, values):
                 # hca_run += hca
 
                 for item in metrics.items():
-                    fpath_val_loss = dpath + str(run) + '_' + str(item[0]) + 'loss.txt'
-                    fpath_val_bacc = dpath + str(run) + '_' + str(item[0]) + 'bacc.txt'
+                    fpath_val_loss = dpath + str(run) + '_' + str(item[0]) + '_loss.txt'
+                    fpath_val_bacc = dpath + str(run) + '_' + str(item[0]) + '_bacc.txt'
                     log_to_file(fpath_val_loss, ','.join(format(x, ".4f") for x in item[1]['loss_lesioned']))
                     log_to_file(fpath_val_bacc, ','.join(format(x, ".4f") for x in item[1]['bacc_lesioned']))
 
