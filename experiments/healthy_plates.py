@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from torchvision.models import resnet18, ResNet18_Weights
-from visualize import HEX_VALUES, CONTRAST_VALUES
+from visualize.hca import HEX_VALUES, CONTRAST_VALUES
 
 
 class HealthyPlatesExperiment:

@@ -48,7 +48,6 @@ def visualize_hex_contrasts(hca_runs, save_path):
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
-        # plt.legend(title='Bg-Fg contrast diff.', loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         plt.savefig(save_path + '_' + str(i) + '.png', bbox_inches='tight')
 

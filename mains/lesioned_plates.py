@@ -1,13 +1,13 @@
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
 from torch.utils.data import Subset, DataLoader
-from experiments.healthy_plates import HealthyPlatesExperiment
+from experiments.lesioned_plates import LesionedPlatesExperiment
 from datasets.plates import plates_dataset
 from file_utils import *
-from visualize.hca import CONTRAST_VALUES, HEX_VALUES, visualize_hex_contrasts
+# from visualize.hca import CONTRAST_VALUES, HEX_VALUES, visualize_hex_contrasts
 
 
-def healthy_plates_main(args, param, values):
+def lesioned_plates_main(args, param, values):
     dpath_parent = '/vision/u/ynshah/NeuroDP/runs/' + args["name"] + '/' + param + '/'
 
     runs = args['runs']
@@ -19,15 +19,12 @@ def healthy_plates_main(args, param, values):
         dpath = dpath_parent + str(value) + '/'
         os.makedirs(dpath, exist_ok=True)
 
-        hca_runs = []
+        # hca_runs = []
 
         for run in range(runs):
             print(f'\trun #{run + 1}\n\t-------')
 
-            fpath_val_loss = dpath + str(run) + '_val_loss.txt'
-            fpath_val_bacc = dpath + str(run) + '_val_bacc.txt'
-
-            hca_run = np.zeros((len(CONTRAST_VALUES), len(HEX_VALUES)))
+            # hca_run = np.zeros((len(CONTRAST_VALUES), len(HEX_VALUES)))
 
             train_val_dataset, test_dataset = plates_dataset('./datasets/plates/')
             train_val_labels = [label for _, label in train_val_dataset]
@@ -44,17 +41,20 @@ def healthy_plates_main(args, param, values):
 
                 print('\t\tFold %d' % fold)
 
-                exp = HealthyPlatesExperiment(args)
-                metrics, hca = exp.run(train_loader, val_loader, test_loader)
+                exp = LesionedPlatesExperiment(args)
+                metrics = exp.run(train_loader, val_loader, test_loader)
 
-                hca_run += hca
+                # hca_run += hca
 
-                log_to_file(fpath_val_loss, ','.join(format(x, ".4f") for x in metrics['val_loss']))
-                log_to_file(fpath_val_bacc, ','.join(format(x, ".4f") for x in metrics['val_bacc']))
+                for item in metrics.items():
+                    fpath_val_loss = dpath + str(run) + '_' + str(item[0]) + 'loss.txt'
+                    fpath_val_bacc = dpath + str(run) + '_' + str(item[0]) + 'bacc.txt'
+                    log_to_file(fpath_val_loss, ','.join(format(x, ".4f") for x in item[1]['loss_lesioned']))
+                    log_to_file(fpath_val_bacc, ','.join(format(x, ".4f") for x in item[1]['bacc_lesioned']))
 
                 fold += 1
 
-            hca_run /= 5.0
-            hca_runs.append(hca_run)
+            # hca_run /= 5.0
+            # hca_runs.append(hca_run)
 
-        visualize_hex_contrasts(hca_runs, dpath + 'hca')
+        # visualize_hex_contrasts(hca_runs, dpath + 'hca')
