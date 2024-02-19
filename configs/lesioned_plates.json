@@ -3,7 +3,7 @@
   "dataset": "plates",
   "runs": 1,
   "probe_epochs": 10,
-  "lesion_iters": 15,
+  "lesion_iters": 10,
   "retrain_epochs": 10,
   "bz": 32,
   "num_workers": 2,

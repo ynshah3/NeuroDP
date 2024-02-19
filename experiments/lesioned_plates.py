@@ -9,28 +9,19 @@ import torch.nn.utils.prune as prune
 
 class LesionedPlatesExperiment:
     def __init__(self, args):
+        self.args = args
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f'\t\tusing {self.device}')
 
         self.model = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
-        num_features = self.model.fc.in_features
+        self.num_features = self.model.fc.in_features
         self.model.fc = nn.Identity()
         self.model.to(self.device).float()
-
-        self.probe = nn.Linear(num_features, args['num_classes'])
-        self.probe.to(self.device).float()
 
         self.probe_epochs = args['probe_epochs']
         self.lesion_iters = args['lesion_iters']
         self.retrain_epochs = args['retrain_epochs']
         self.criterion = nn.CrossEntropyLoss()
-        self.probe_optimizer = torch.optim.Adam(
-            list(filter(lambda p: p.requires_grad, self.probe.parameters())),
-            lr=args['lr'],
-            weight_decay=args['weight_decay'],
-            betas=(args['beta1'], args['beta2']),
-            eps=args['eps']
-        )
         # self.model_optimizer = torch.optim.SGD(
         #     list(filter(lambda p: p.requires_grad, self.model.parameters())),
         #     lr=args['lr'],
@@ -52,6 +43,7 @@ class LesionedPlatesExperiment:
 
         metrics = {}
         for layer_idx, conv_layer in enumerate(conv_layers):
+            conv_layer_orig = conv_layer.weight.data.clone()
             print(f"\t\tLesioning Layer {layer_idx}")
             layer_metrics = {'loss_lesioned': [], 'bacc_lesioned': []}
 
@@ -62,29 +54,40 @@ class LesionedPlatesExperiment:
                 loss, acc, _ = self.fit_probe(train_loader, val_loader, test_loader)
                 layer_metrics['loss_lesioned'].append(loss)
                 layer_metrics['bacc_lesioned'].append(acc)
+            
+            # reset current layer
+            prune.remove(conv_layer, 'weight')
+            conv_layer.weight.data = conv_layer_orig.clone()
 
             metrics[layer_idx] = layer_metrics
 
         return metrics
 
     def fit_probe(self, train_loader, val_loader, test_loader):
-        probe_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.probe_optimizer,
+        probe = nn.Linear(self.num_features, self.args['num_classes'])
+        probe.to(self.device).float()
+        probe_optimizer = torch.optim.Adam(
+            list(filter(lambda p: p.requires_grad, probe.parameters())),
+            lr=self.args['lr'],
+            weight_decay=self.args['weight_decay'],
+        )
+        probe_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=probe_optimizer,
                                                                         T_max=self.probe_epochs)
         print('\t\t\t\tFitting probe...')
 
         for epoch in range(self.probe_epochs):
-            self.train(train_loader)
-            val_metrics = self.test(val_loader, is_val=True)
+            self.train(probe, train_loader, probe_optimizer)
+            val_metrics = self.test(probe, val_loader, is_val=True)
             print(f'\t\t\t\tEpoch {epoch + 1}: val_loss={val_metrics[0]:.4f}, val_bacc={val_metrics[1]:.4f}')
             probe_lr_scheduler.step()
 
-        loss, acc, hca = self.test(test_loader, is_val=False)
+        loss, acc, hca = self.test(probe, test_loader, is_val=False)
 
         return loss, acc, hca
 
-    def compute_metrics(self, inputs, targets, is_test=False, hexes=None, contrasts=None, hex_contrast_acc=None):
+    def compute_metrics(self, head, inputs, targets, is_test=False, hexes=None, contrasts=None, hex_contrast_acc=None):
         features = self.model(inputs)
-        output = self.probe(features)
+        output = head(features)
         loss = self.criterion(output, targets)
         predicted = torch.argmax(output, 1)
         bacc = (targets == predicted).sum()
@@ -98,22 +101,22 @@ class LesionedPlatesExperiment:
 
         return loss, bacc, hex_contrast_acc
 
-    def train(self, loader):
-        self.probe.train()
+    def train(self, head, loader, optimizer):
+        head.train()
 
         for inputs, targets in loader:
             inputs, targets = inputs.to(self.device), targets.to(self.device)
 
-            self.probe_optimizer.zero_grad()
+            optimizer.zero_grad()
 
-            loss, _, _ = self.compute_metrics(inputs, targets, is_test=False)
+            loss, _, _ = self.compute_metrics(head, inputs, targets, is_test=False)
 
             loss.backward()
-            self.probe_optimizer.step()
+            optimizer.step()
 
-    def test(self, loader, is_val=True):
+    def test(self, head, loader, is_val=True):
         self.model.eval()
-        self.probe.eval()
+        head.eval()
 
         test_loss = 0.0
         test_bacc = 0.0
@@ -125,6 +128,7 @@ class LesionedPlatesExperiment:
                     inputs, targets = inputs.to(self.device), targets.to(self.device)
 
                     loss, b_acc, _ = self.compute_metrics(
+                        head=head,
                         inputs=inputs,
                         targets=targets,
                         is_test=False
@@ -137,6 +141,7 @@ class LesionedPlatesExperiment:
                     inputs, targets = inputs.to(self.device), targets.to(self.device)
 
                     loss, b_acc, hex_contrast_acc = self.compute_metrics(
+                        head=head,
                         inputs=inputs,
                         targets=targets,
                         is_test=False,
