@@ -1,8 +1,19 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from torchvision.models import resnet18, ResNet18_Weights
+# from torchvision.models import resnet18, ResNet18_Weights
 from visualize.hca import HEX_VALUES, CONTRAST_VALUES
+from cornet_s import CORnet_S
+
+
+def get_model(map_location=None):
+    model_hash = '1d3f7974'
+    model = CORnet_S()
+    model = torch.nn.DataParallel(model)
+    url = f'https://s3.amazonaws.com/cornet-models/cornet_s-{model_hash}.pth'
+    ckpt_data = torch.hub.load_state_dict_from_url(url, map_location=map_location)
+    model.load_state_dict(ckpt_data['state_dict'])
+    return model
 
 
 class HealthyPlatesExperiment:
@@ -10,7 +21,8 @@ class HealthyPlatesExperiment:
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f'\t\tusing {self.device}')
 
-        self.model = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+        # self.model = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+        self.model = get_model(map_location=self.device)
 
         # freeze resnet18 body
         for param in self.model.parameters():
@@ -48,7 +60,8 @@ class HealthyPlatesExperiment:
 
             self.lr_scheduler.step()
 
-        _, _, hex_contrast_acc = self.test(test_loader, is_val=False)
+        loss, acc, hex_contrast_acc = self.test(test_loader, is_val=False)
+        print(f'\t\t\tTest loss: {loss:.4f}, Test Acc: {acc:.4f}')
 
         return metrics, hex_contrast_acc
 
