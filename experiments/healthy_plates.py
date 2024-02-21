@@ -28,11 +28,11 @@ class HealthyPlatesExperiment:
         for param in self.model.parameters():
             param.requires_grad = False
 
-        num_features = self.model.fc.in_features
-        self.model.fc = nn.Linear(num_features, args['num_classes'])
+        num_features = self.model.module.decoder.linear.in_features
+        self.model.module.decoder.linear = nn.Linear(num_features, args['num_classes'])
 
         # train linear probe
-        for param in self.model.fc.parameters():
+        for param in self.model.module.decoder.linear.parameters():
             param.requires_grad = True
 
         self.model.to(self.device).float()

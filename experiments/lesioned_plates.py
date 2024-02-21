@@ -5,6 +5,17 @@ from torchvision.models import resnet18, ResNet18_Weights
 from visualize.hca import HEX_VALUES, CONTRAST_VALUES
 from visualize.rdm import get_rdm
 import torch.nn.utils.prune as prune
+from cornet_s import CORnet_S
+
+
+def get_model(map_location=None):
+    model_hash = '1d3f7974'
+    model = CORnet_S()
+    model = torch.nn.DataParallel(model)
+    url = f'https://s3.amazonaws.com/cornet-models/cornet_s-{model_hash}.pth'
+    ckpt_data = torch.hub.load_state_dict_from_url(url, map_location=map_location)
+    model.load_state_dict(ckpt_data['state_dict'])
+    return model
 
 
 class LesionedPlatesExperiment:
@@ -13,53 +24,44 @@ class LesionedPlatesExperiment:
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f'\t\tusing {self.device}')
 
-        self.model = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
-        self.num_features = self.model.fc.in_features
-        self.model.fc = nn.Identity()
+        self.model = get_model(map_location=self.device)
+        self.num_features = self.model.module.decoder.linear.in_features
+        self.model.module.decoder.linear = nn.Identity()
         self.model.to(self.device).float()
 
         self.probe_epochs = args['probe_epochs']
         self.lesion_iters = args['lesion_iters']
         self.retrain_epochs = args['retrain_epochs']
         self.criterion = nn.CrossEntropyLoss()
-        # self.model_optimizer = torch.optim.SGD(
-        #     list(filter(lambda p: p.requires_grad, self.model.parameters())),
-        #     lr=args['lr'],
-        #     weight_decay=args['weight_decay'],
-        #    momentum=0.9
-        # )
 
     def get_healthy_rdm(self, loader):
         return get_rdm(self.model, loader, self.device)
 
-    def percent_pruned_params(self, module):
-        pruned_params = torch.sum(module.weight_mask == 0)
-        total = sum(param.numel() for param in module.parameters())
-        return pruned_params / total
-
     def run(self, train_loader, val_loader, test_loader):
-        conv_layers = [module for module in self.model.modules() if
-                       isinstance(module, torch.nn.Conv2d) and module.kernel_size != (1, 1)]
-
         metrics = {}
-        for layer_idx, conv_layer in enumerate(conv_layers):
-            conv_layer_orig = conv_layer.weight.data.clone()
-            print(f"\t\tLesioning Layer {layer_idx}")
-            layer_metrics = {'loss_lesioned': [], 'bacc_lesioned': []}
+
+        for region_idx, region in enumerate([self.model.module.V1, self.model.module.V2, self.model.module.V4, self.model.module.IT]):
+            conv_layers = [module for module in region.modules() if isinstance(module, torch.nn.Conv2d)]
+            conv_layer_orig = [x.weight.data.clone() for x in conv_layers]
+            print(f"\t\tLesioning region {region_idx}")
+            layer_metrics = {'loss_lesioned': [], 'bacc_lesioned': [], 'hca_lesioned': []}
 
             for i in range(self.lesion_iters):
                 print(f'\t\t\tIteration {i + 1}')
-                pruned_module = prune.random_unstructured(conv_layer, name='weight', amount=0.2)
-                print(f"\t\t\tpruned params: {self.percent_pruned_params(pruned_module):.4f}%")
-                loss, acc, _ = self.fit_probe(train_loader, val_loader, test_loader)
+                for x in conv_layers:
+                    prune.random_unstructured(x, name='weight', amount=0.2)
+                loss, acc, hca = self.fit_probe(train_loader, val_loader, test_loader)
+                layer_metrics['hca_lesioned'].append(hca)
                 layer_metrics['loss_lesioned'].append(loss)
                 layer_metrics['bacc_lesioned'].append(acc)
             
-            # reset current layer
-            prune.remove(conv_layer, 'weight')
-            conv_layer.weight.data = conv_layer_orig.clone()
+            # reset current region
+            for c, x in enumerate(conv_layers):
+                prune.remove(x, 'weight')
+                x.weight.data = conv_layer_orig[c].clone()
 
-            metrics[layer_idx] = layer_metrics
+            layer_metrics['hca_lesioned'] = np.array(layer_metrics['hca_lesioned'])
+            metrics[region_idx] = layer_metrics
 
         return metrics
 
@@ -144,7 +146,7 @@ class LesionedPlatesExperiment:
                         head=head,
                         inputs=inputs,
                         targets=targets,
-                        is_test=False,
+                        is_test=True,
                         hexes=hexes,
                         contrasts=contrasts,
                         hex_contrast_acc=hex_contrast_acc
