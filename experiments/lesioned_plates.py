@@ -28,10 +28,13 @@ class LesionedPlatesExperiment:
         self.num_features = self.model.module.decoder.linear.in_features
         self.model.module.decoder.linear = nn.Identity()
         self.model.to(self.device).float()
+        
+        for param in self.model.parameters():
+            param.requires_grad = False
 
-        self.probe_epochs = args['probe_epochs']
-        self.lesion_iters = args['lesion_iters']
-        self.retrain_epochs = args['retrain_epochs']
+        self.probe_epochs = int(args['probe_epochs'])
+        self.lesion_iters = int(args['lesion_iters'])
+        self.retrain_epochs = int(args['retrain_epochs'])
         self.criterion = nn.CrossEntropyLoss()
 
     def get_healthy_rdm(self, loader):

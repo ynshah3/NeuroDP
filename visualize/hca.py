@@ -50,6 +50,7 @@ def visualize_hex_contrasts(hca_runs, save_path):
 
         plt.tight_layout()
         plt.savefig(save_path + '_' + str(i) + '.png', bbox_inches='tight')
+    plt.close()
 
 
 if __name__ == '__main__':

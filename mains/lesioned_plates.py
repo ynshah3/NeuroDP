@@ -26,7 +26,7 @@ def lesioned_plates_main(args, param, values):
             train_val_dataset, test_dataset = plates_dataset('./datasets/plates/')
             train_val_labels = [label for _, label in train_val_dataset]
             skf = StratifiedKFold(n_splits=5, shuffle=True)
-            metrics_fold = {i: np.zeros((args['lesion_iters'], len(CONTRAST_VALUES), len(HEX_VALUES))) for i in range(4)}
+            metrics_fold = {i: np.zeros((5, args['lesion_iters'], len(CONTRAST_VALUES), len(HEX_VALUES))) for i in range(4)}
 
             fold = 0
             for train_idx, val_idx in skf.split(train_val_dataset, train_val_labels):
@@ -47,14 +47,16 @@ def lesioned_plates_main(args, param, values):
                     fpath_val_bacc = dpath + str(run) + '_' + str(item[0]) + '_bacc.txt'
                     log_to_file(fpath_val_loss, ','.join(format(x, ".4f") for x in item[1]['loss_lesioned']))
                     log_to_file(fpath_val_bacc, ','.join(format(x, ".4f") for x in item[1]['bacc_lesioned']))
-                    metrics_fold[item[0]] += item[1]['hca_lesioned']
+                    metrics_fold[item[0]][fold] = item[1]['hca_lesioned']
 
                 fold += 1
 
             for r in range(4):
-                metrics_run[r][run] = metrics_fold[r] / 5.0
+                for l in range(int(args['lesion_iters'])):
+                #  metrics_run[r][run] = metrics_fold[r] / 5.0
+                    visualize_hex_contrasts(np.squeeze(metrics_fold[r][:, l, :, :]), dpath + str(l) + '_hca')
 
-        for r in range(4):
-            for l in range(args['lesion_iters']):
-                arr = np.squeeze(metrics_run[r][:, l, :, :])
-                visualize_hex_contrasts(arr, dpath + str(r) + '_' + str(l) + '_hca')
+       # for r in range(4):
+         #   for l in range(args['lesion_iters']):
+               # arr = np.squeeze(metrics_run[r][:, l, :, :])
+               #  visualize_hex_contrasts(arr, dpath + str(r) + '_' + str(l) + '_hca')
