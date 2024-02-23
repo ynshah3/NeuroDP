@@ -1,6 +1,6 @@
 import torch
 from torchvision.datasets import ImageFolder
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 from torchvision.transforms import v2
 import matplotlib.pyplot as plt
 import os
@@ -29,7 +29,9 @@ def plates_dataset(image_dir='./datasets/plates/'):
     transform = v2.Compose([
         v2.Resize((224, 224)),
         v2.PILToTensor(),
-        v2.ToDtype(torch.float32)
+        v2.ToDtype(torch.float32),
+        v2.Normalize(mean=[0, 0, 0], std=[255.0, 255.0, 255.0]),
+        v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
     train_dataset = ImageFolder(root=image_dir + 'train/', transform=transform)

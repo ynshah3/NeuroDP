@@ -1,59 +1,43 @@
-import pandas as pd
+import torch
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
-from torchvision.models import resnet18, ResNet18_Weights
 from datasets.plates import plates_dataset
+from cornet_s import CORnet_S
 
 
 matplotlib.rc('font', **{'size': 15})
 
 
+def get_model(map_location=None):
+    model_hash = '1d3f7974'
+    model = CORnet_S()
+    model = torch.nn.DataParallel(model)
+    url = f'https://s3.amazonaws.com/cornet-models/cornet_s-{model_hash}.pth'
+    ckpt_data = torch.hub.load_state_dict_from_url(url, map_location=map_location)
+    model.load_state_dict(ckpt_data['state_dict'])
+    return model
+
+
 def get_rdm(model, loader, device):
-    activation = {}
+    activations_list = []
 
-    def get_activation(name):
-        def hook(_, __, output):
-            activation[name] = output.detach()
-        return hook
+    with torch.no_grad():
+        for images, _, _ in loader:
+            images = images.to(device)
+            activations = model(images)
+            activations_list.append(activations)
 
-    gt_class = [loader.dataset[i][1] for i in range(len(loader.dataset))]
-    lists = [[] for _ in range(10)]
-
-    # sort indices of images into lists corresponding to same class
-    for i in range(len(gt_class)):
-        for j in range(10):
-            if gt_class[i] == j:
-                lists[j].append(i)
-
-    model.avgpool.register_forward_hook(get_activation('penultimate_layer'))
-    model.eval()
-
-    activation_layers = dict()
-    activation_layers[model.avgpool] = {}
-    layer_name = model.avgpool
-
-    for i in range(len(lists)):
-        for j in range(120):
-            img, label, _ = loader.dataset[lists[i][j]]
-            img = img.to(device)
-            model(img.unsqueeze(0))
-            get_layer_activation = activation['penultimate_layer']
-            get_layer_activation = get_layer_activation.cpu()
-            activ = np.asarray(get_layer_activation).squeeze()
-            activation_layers[layer_name]['img_' + str(i) + str(j)] = activ.flatten()
-
-    df = pd.DataFrame(activation_layers[layer_name])
-    return 1 - df.corr()
+    activations_tensor = torch.cat(activations_list, dim=0)
+    return 1 - np.corrcoef(activations_tensor.cpu().numpy())
 
 
 def visualize_rdm(matrix, save_path):
     f, ax = plt.subplots()
-    plt.matshow(matrix, cmap='jet')
+    plt.matshow(matrix, fignum=f.number)
     cb = plt.colorbar(fraction=0.046, pad=0.04)
     cb.ax.tick_params(labelsize=15)
-
     plt.xlabel('Visual Stimuli')
     plt.ylabel('Visual Stimuli')
     plt.clim(0, 1)
@@ -75,8 +59,9 @@ def visualize_rdm(matrix, save_path):
 
 
 if __name__ == '__main__':
-    model = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
-    train_dataset, test_dataset = plates_dataset(image_dir='../datasets/plates/')
-    test_loader = DataLoader(dataset=test_dataset, batch_size=32, num_workers=0, shuffle=True)
+    model = get_model(map_location='cpu')
+    model.module.decoder.linear = torch.nn.Identity()
+    test_dataset = plates_dataset(image_dir='../datasets/plates/')[1]
+    test_loader = DataLoader(dataset=test_dataset, batch_size=8, num_workers=0, shuffle=False)
     rdm = get_rdm(model, test_loader, 'cpu')
     visualize_rdm(rdm, '../assets/sample_rdm.png')

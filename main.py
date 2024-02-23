@@ -1,6 +1,7 @@
 from file_utils import read_file_in_dir
 from mains.healthy_plates import healthy_plates_main
 from mains.lesioned_plates import lesioned_plates_main
+from mains.lesioned_retrain_plates import lesioned_retrain_plates_main
 import sys
 
 
@@ -17,5 +18,7 @@ if __name__ == '__main__':
         healthy_plates_main(args, param, values)
     elif args['name'] == 'lesioned_plates':
         lesioned_plates_main(args, param, values)
+    elif args['name'] == 'lesioned_retrain_plates':
+        lesioned_retrain_plates_main(args, param, values)
     else:
         raise NotImplementedError()
