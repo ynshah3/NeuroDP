@@ -27,17 +27,22 @@ class LesionedRetrainPlatesExperiment:
 
         self.model = get_model(map_location=self.device)
         self.num_features = self.model.module.decoder.linear.in_features
+        self.head = self.model.module.decoder.linear.to(self.device).float()
         self.model.module.decoder.linear = nn.Identity()
         self.model.to(self.device).float()
 
         for param in self.model.parameters():
             param.requires_grad = False
 
+        for param in self.head.parameters():
+            param.requires_grad = True
+
         self.probe_epochs = int(args['probe_epochs'])
         self.lesion_iters = int(args['lesion_iters'])
         self.retrain_epochs = int(args['retrain_epochs'])
         self.region_idx = int(args['region_idx'])
-        self.retrain_cortex = bool(args['retrain_cortex'])
+        self.retrain_cortex = False if args['retrain_cortex'].lower() == 'false' else True
+        print(f'\t\tretraining cortex: {self.retrain_cortex}')
         self.criterion = nn.CrossEntropyLoss()
 
     def get_healthy_rdm(self, loader):
@@ -84,7 +89,7 @@ class LesionedRetrainPlatesExperiment:
                     for param in conv_layer.parameters():
                         param.requires_grad = True
 
-            self.retrain(**loaders[3:])
+            self.retrain(*loaders[3:])
 
             torch.save(self.model.state_dict(), path + '_ckpt_retrained_' + str(i) + '.pt')
 
@@ -94,30 +99,35 @@ class LesionedRetrainPlatesExperiment:
             metrics['tau_retrained'].append(tau)
             metrics['p_retrained'].append(p_value)
 
-            loss, acc, _ = self.fit_probe(**loaders[:3])
+            loss, acc, _ = self.fit_probe(*loaders[:3])
             metrics['loss_retrained'].append(loss)
             metrics['bacc_retrained'].append(acc)
         return metrics
 
     def retrain(self, train_loader, val_loader):
-        head = nn.Linear(self.num_features, 1000)
-        head.to(self.device).float()
-        head_optimizer = torch.optim.Adam(
-            list(filter(lambda p: p.requires_grad, head.parameters())),
+        for param in self.head.parameters():
+            param.requires_grad = True
+
+        head_optimizer = torch.optim.SGD(
+            list(filter(lambda p: p.requires_grad, self.head.parameters())),
             lr=self.args['lr_head'],
+            momentum=0.9,
             weight_decay=self.args['weight_decay'],
         )
-        head_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=head_optimizer,
-                                                                        T_max=self.retrain_epochs)
+
         print('\t\t\t\tRetraining...')
 
-        for epoch in range(self.retrain_epochs):
-            self.train(head, train_loader, head_optimizer)
-            val_metrics = self.test(head, val_loader, is_val=True)
-            print(f'\t\t\t\tEpoch {epoch + 1}: val_loss={val_metrics[0]:.4f}, val_bacc={val_metrics[1]:.4f}')
-            head_lr_scheduler.step()
+        self.train(self.head, train_loader, head_optimizer, verbose=True, iter_stop=self.retrain_epochs)
+        # val_metrics = self.test(self.head, val_loader, is_val=True)
+        # print(f'\t\t\t\tval_loss={val_metrics[0]:.4f}, val_bacc={val_metrics[1]:.4f}')
 
     def fit_probe(self, train_loader, val_loader, test_loader):
+        for param in self.model.parameters():
+            param.requires_grad = False
+
+        for param in self.head.parameters():
+            param.requires_grad = False
+
         probe = nn.Linear(self.num_features, self.args['num_classes'])
         probe.to(self.device).float()
         probe_optimizer = torch.optim.Adam(
@@ -135,7 +145,7 @@ class LesionedRetrainPlatesExperiment:
             print(f'\t\t\t\tEpoch {epoch + 1}: val_loss={val_metrics[0]:.4f}, val_bacc={val_metrics[1]:.4f}')
             probe_lr_scheduler.step()
 
-        loss, acc, hca = self.test(probe, test_loader, is_val=True)
+        loss, acc, hca = self.test(probe, test_loader, is_val=False)
 
         return loss, acc, hca
 
@@ -155,22 +165,31 @@ class LesionedRetrainPlatesExperiment:
 
         return loss, bacc, hex_contrast_acc
 
-    def train(self, head, loader, optimizer):
+    def train(self, head, loader, optimizer, verbose=False, iter_stop=None):
         head.train()
+        self.model.train()
+        self.head.train()
 
-        for inputs, targets in loader:
+        for it, (inputs, targets) in enumerate(loader):
+            if it == iter_stop:
+                break
+
             inputs, targets = inputs.to(self.device), targets.to(self.device)
 
             optimizer.zero_grad()
 
-            loss, _, _ = self.compute_metrics(head, inputs, targets, is_test=False)
+            loss, acc, _ = self.compute_metrics(head, inputs, targets, is_test=False)
 
+            if verbose and (it % 20 == 0):
+                print(f'\t\t\t\tIter {it + 1}: train_loss={loss:.4f}, train_bacc={acc:.4f}')
+            
             loss.backward()
             optimizer.step()
 
     def test(self, head, loader, is_val=True):
         self.model.eval()
         head.eval()
+        self.head.eval()
 
         test_loss = 0.0
         test_bacc = 0.0
@@ -198,7 +217,7 @@ class LesionedRetrainPlatesExperiment:
                         head=head,
                         inputs=inputs,
                         targets=targets,
-                        is_test=True,
+                        is_test=False,
                         hexes=hexes,
                         contrasts=contrasts,
                         hex_contrast_acc=hex_contrast_acc

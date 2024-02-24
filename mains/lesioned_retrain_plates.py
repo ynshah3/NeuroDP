@@ -11,7 +11,7 @@ def lesioned_retrain_plates_main(args, param, values):
     dpath_parent = '/vision/u/ynshah/NeuroDP/runs/' + args["name"] + '/' + param + '/'
 
     runs = args['runs']
-    for value in np.array(values.split(',')).astype(float):
+    for value in np.array(values.split(',')):
         hparams = {param: value.item()}
         args[param] = value.item()
         print(hparams)
@@ -35,8 +35,8 @@ def lesioned_retrain_plates_main(args, param, values):
                 train_loader = DataLoader(train_dataset, batch_size=int(args['bz']), num_workers=args['num_workers'], shuffle=True)
                 val_loader = DataLoader(val_dataset, batch_size=int(args['bz']), num_workers=args['num_workers'], shuffle=False)
                 test_loader = DataLoader(test_dataset, batch_size=int(args['bz']), num_workers=args['num_workers'], shuffle=False)
-                imgnet_train_loader = DataLoader(imagenet_train, batch_size=256, num_workers=args['num_workers'], shuffle=True)
-                imgnet_val_loader = DataLoader(imagenet_val, batch_size=256, num_workers=args['num_workers'], shuffle=False)
+                imgnet_train_loader = DataLoader(imagenet_train, batch_size=128, num_workers=args['num_workers'], shuffle=True)
+                imgnet_val_loader = DataLoader(imagenet_val, batch_size=128, num_workers=args['num_workers'], shuffle=False)
 
                 print('\t\tFold %d' % fold)
 
@@ -51,3 +51,4 @@ def lesioned_retrain_plates_main(args, param, values):
                     log_to_file(fpath, ','.join(format(x, ".4f") for x in item[1]))
 
                 fold += 1
+                break
