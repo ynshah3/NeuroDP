@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from sklearn.model_selection import StratifiedKFold
+from torch.utils.data import Subset, DataLoader
 from scipy.stats import kendalltau
 from file_utils import log_to_file
-from visualize.hca import HEX_VALUES, CONTRAST_VALUES
 from visualize.rdm import get_rdm
 import torch.nn.utils.prune as prune
 from cornet_s import CORnet_S
@@ -50,8 +51,8 @@ class LesionedRetrainPlatesExperiment:
 
     def run(self, loaders, path):
         metrics = {
-            'loss_retrained': [],
-            'bacc_retrained': [],
+            'loss_retrained': np.zeros(self.lesion_iters),
+            'bacc_retrained': np.zeros(self.lesion_iters),
             'tau_lesioned': [],
             'tau_retrained': [],
             'p_lesioned': [],
@@ -64,6 +65,8 @@ class LesionedRetrainPlatesExperiment:
         log_to_file(path + '_rdm.txt', 'rdm=' + str(rdm_healthy.tolist()))
 
         conv_layers = [module for module in region.modules() if isinstance(module, torch.nn.Conv2d)]
+
+        train_val_labels = [label for _, label in loaders[0]]
 
         for i in range(self.lesion_iters):
             for param in self.model.parameters():
@@ -89,7 +92,7 @@ class LesionedRetrainPlatesExperiment:
                     for param in conv_layer.parameters():
                         param.requires_grad = True
 
-            self.retrain(*loaders[3:])
+            self.retrain(loaders[2])
 
             torch.save(self.model.state_dict(), path + '_ckpt_retrained_' + str(i) + '.pt')
 
@@ -99,12 +102,31 @@ class LesionedRetrainPlatesExperiment:
             metrics['tau_retrained'].append(tau)
             metrics['p_retrained'].append(p_value)
 
-            loss, acc, _ = self.fit_probe(*loaders[:3])
-            metrics['loss_retrained'].append(loss)
-            metrics['bacc_retrained'].append(acc)
+            skf = StratifiedKFold(n_splits=5, shuffle=True)
+
+            fold = 0
+            for train_idx, val_idx in skf.split(loaders[0], train_val_labels):
+                print('\t\t\tFold %d' % fold)
+
+                train_dataset = Subset(loaders[0], train_idx)
+                val_dataset = Subset(loaders[0], val_idx)
+
+                train_loader = DataLoader(train_dataset, batch_size=int(self.args['bz']), num_workers=self.args['num_workers'],
+                                          shuffle=True)
+                val_loader = DataLoader(val_dataset, batch_size=int(self.args['bz']), num_workers=self.args['num_workers'],
+                                        shuffle=False)
+                test_loader = DataLoader(loaders[1], batch_size=int(self.args['bz']), num_workers=self.args['num_workers'],
+                                         shuffle=False)
+                loss, acc = self.fit_probe(train_loader, val_loader, test_loader)
+                metrics['loss_retrained'][i] += loss
+                metrics['bacc_retrained'][i] += acc
+
+            metrics['loss_retrained'] /= 5.
+            metrics['bacc_retrained'] /= 5.
+
         return metrics
 
-    def retrain(self, train_loader, val_loader):
+    def retrain(self, train_loader):
         for param in self.head.parameters():
             param.requires_grad = True
 
@@ -115,11 +137,11 @@ class LesionedRetrainPlatesExperiment:
             weight_decay=self.args['weight_decay'],
         )
 
-        print('\t\t\t\tRetraining...')
+        head_lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=head_optimizer, step_size=1024, gamma=0.1)
 
-        self.train(self.head, train_loader, head_optimizer, verbose=True, iter_stop=self.retrain_epochs)
-        # val_metrics = self.test(self.head, val_loader, is_val=True)
-        # print(f'\t\t\t\tval_loss={val_metrics[0]:.4f}, val_bacc={val_metrics[1]:.4f}')
+        print('\t\t\tRetraining...')
+
+        self.train(self.head, train_loader, head_optimizer, head_lr_scheduler, verbose=True, iter_stop=self.retrain_epochs)
 
     def fit_probe(self, train_loader, val_loader, test_loader):
         for param in self.model.parameters():
@@ -137,7 +159,7 @@ class LesionedRetrainPlatesExperiment:
         )
         probe_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=probe_optimizer,
                                                                         T_max=self.probe_epochs)
-        print('\t\t\t\tFitting probe...')
+        print('\t\t\tFitting probe...')
 
         for epoch in range(self.probe_epochs):
             self.train(probe, train_loader, probe_optimizer)
@@ -145,30 +167,24 @@ class LesionedRetrainPlatesExperiment:
             print(f'\t\t\t\tEpoch {epoch + 1}: val_loss={val_metrics[0]:.4f}, val_bacc={val_metrics[1]:.4f}')
             probe_lr_scheduler.step()
 
-        loss, acc, hca = self.test(probe, test_loader, is_val=False)
+        loss, acc = self.test(probe, test_loader, is_val=False)
 
-        return loss, acc, hca
+        return loss, acc
 
-    def compute_metrics(self, head, inputs, targets, is_test=False, hexes=None, contrasts=None, hex_contrast_acc=None):
+    def compute_metrics(self, head, inputs, targets):
         features = self.model(inputs)
         output = head(features)
         loss = self.criterion(output, targets)
         predicted = torch.argmax(output, 1)
         bacc = (targets == predicted).sum()
 
-        if is_test:
-            for i in range(len(predicted)):
-                contrast_index = CONTRAST_VALUES.index(contrasts[i])
-                hex_index = HEX_VALUES.index(hexes[i])
-                if predicted[i] == targets[i]:
-                    hex_contrast_acc[contrast_index][hex_index] += 1
+        return loss, bacc
 
-        return loss, bacc, hex_contrast_acc
-
-    def train(self, head, loader, optimizer, verbose=False, iter_stop=None):
+    def train(self, head, loader, optimizer, lr_scheduler=None, verbose=False, iter_stop=None):
         head.train()
         self.model.train()
         self.head.train()
+        log_every = 1 if iter_stop <= 32 else iter_stop // 32
 
         for it, (inputs, targets) in enumerate(loader):
             if it == iter_stop:
@@ -178,13 +194,16 @@ class LesionedRetrainPlatesExperiment:
 
             optimizer.zero_grad()
 
-            loss, acc, _ = self.compute_metrics(head, inputs, targets, is_test=False)
+            loss, acc = self.compute_metrics(head, inputs, targets)
 
-            if verbose and (it % 20 == 0):
-                print(f'\t\t\t\tIter {it + 1}: train_loss={loss:.4f}, train_bacc={acc:.4f}')
+            if verbose and (it % log_every == 0):
+                print(f'\t\t\tIter {it + 1}: train_loss={loss:.4f}, train_bacc={acc:.4f}')
             
             loss.backward()
             optimizer.step()
+
+            if lr_scheduler:
+                lr_scheduler.step()
 
     def test(self, head, loader, is_val=True):
         self.model.eval()
@@ -193,39 +212,32 @@ class LesionedRetrainPlatesExperiment:
 
         test_loss = 0.0
         test_bacc = 0.0
-        hex_contrast_acc = np.zeros((len(CONTRAST_VALUES), len(HEX_VALUES)))
 
         with torch.no_grad():
             if is_val:
                 for inputs, targets in loader:
                     inputs, targets = inputs.to(self.device), targets.to(self.device)
 
-                    loss, b_acc, _ = self.compute_metrics(
+                    loss, b_acc = self.compute_metrics(
                         head=head,
                         inputs=inputs,
                         targets=targets,
-                        is_test=False
                     )
 
                     test_loss += loss
                     test_bacc += b_acc
             else:
-                for inputs, targets, (hexes, contrasts) in loader:
+                for inputs, targets, _ in loader:
                     inputs, targets = inputs.to(self.device), targets.to(self.device)
 
-                    loss, b_acc, hex_contrast_acc = self.compute_metrics(
+                    loss, b_acc = self.compute_metrics(
                         head=head,
                         inputs=inputs,
-                        targets=targets,
-                        is_test=False,
-                        hexes=hexes,
-                        contrasts=contrasts,
-                        hex_contrast_acc=hex_contrast_acc
+                        targets=targets
                     )
 
                     test_loss += loss
                     test_bacc += b_acc
 
         return test_loss.detach().cpu().item() / len(loader), \
-               test_bacc / len(loader.dataset), \
-               hex_contrast_acc / 20
+               test_bacc / len(loader.dataset)
