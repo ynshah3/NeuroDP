@@ -60,8 +60,11 @@ class LesionedRetrainPlatesExperiment:
         }
         regions = [self.model.module.V1, self.model.module.V2, self.model.module.V4, self.model.module.IT]
         region = regions[self.region_idx]
+        
+        test_loader = DataLoader(loaders[1], batch_size=int(self.args['bz']), num_workers=self.args['num_workers'],
+                                         shuffle=False)
 
-        rdm_healthy = get_rdm(self.model, loaders[2], self.device)
+        rdm_healthy = get_rdm(self.model, test_loader, self.device)
         log_to_file(path + '_rdm.txt', 'rdm=' + str(rdm_healthy.tolist()))
 
         conv_layers = [module for module in region.modules() if isinstance(module, torch.nn.Conv2d)]
@@ -72,19 +75,19 @@ class LesionedRetrainPlatesExperiment:
             for param in self.model.parameters():
                 param.requires_grad = False
 
-            print(f'\t\t\tIteration {i + 1}')
+            print(f'\t\tIteration {i + 1}')
             for x in conv_layers:
                 prune.random_unstructured(x, name='weight', amount=0.2)
 
             torch.save(self.model.state_dict(), path + '_ckpt_pruned_' + str(i) + '.pt')
-
-            rdm_pruned = get_rdm(self.model, loaders[2], self.device)
+            
+            rdm_pruned = get_rdm(self.model, test_loader, self.device)
             log_to_file(path + '_rdm.txt', 'rdm_pruned_' + str(i) + '=' + str(rdm_pruned.tolist()))
             tau, p_value = kendalltau(rdm_healthy.flatten(), rdm_pruned.flatten())
             metrics['tau_lesioned'].append(tau)
             metrics['p_lesioned'].append(p_value)
 
-            if self.args['retrain_cortex']:
+            if self.retrain_cortex:
                 for param in self.model.parameters():
                     param.requires_grad = True
             else:
@@ -96,7 +99,7 @@ class LesionedRetrainPlatesExperiment:
 
             torch.save(self.model.state_dict(), path + '_ckpt_retrained_' + str(i) + '.pt')
 
-            rdm_retrained = get_rdm(self.model, loaders[2], self.device)
+            rdm_retrained = get_rdm(self.model, test_loader, self.device)
             log_to_file(path + '_rdm.txt', 'rdm_retrained_' + str(i) + '=' + str(rdm_retrained.tolist()))
             tau, p_value = kendalltau(rdm_healthy.flatten(), rdm_retrained.flatten())
             metrics['tau_retrained'].append(tau)
@@ -115,11 +118,11 @@ class LesionedRetrainPlatesExperiment:
                                           shuffle=True)
                 val_loader = DataLoader(val_dataset, batch_size=int(self.args['bz']), num_workers=self.args['num_workers'],
                                         shuffle=False)
-                test_loader = DataLoader(loaders[1], batch_size=int(self.args['bz']), num_workers=self.args['num_workers'],
-                                         shuffle=False)
                 loss, acc = self.fit_probe(train_loader, val_loader, test_loader)
                 metrics['loss_retrained'][i] += loss
                 metrics['bacc_retrained'][i] += acc
+
+                fold += 1
 
             metrics['loss_retrained'] /= 5.
             metrics['bacc_retrained'] /= 5.
@@ -184,7 +187,8 @@ class LesionedRetrainPlatesExperiment:
         head.train()
         self.model.train()
         self.head.train()
-        log_every = 1 if iter_stop <= 32 else iter_stop // 32
+        if verbose:
+            log_every = 1 if iter_stop <= 32 else iter_stop // 32
 
         for it, (inputs, targets) in enumerate(loader):
             if it == iter_stop:

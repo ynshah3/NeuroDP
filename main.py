@@ -18,7 +18,7 @@ if __name__ == '__main__':
         healthy_plates_main(args, param, values)
     elif args['name'] == 'lesioned_plates':
         lesioned_plates_main(args, param, values)
-    elif args['name'] == 'lesioned_retrain_plates':
+    elif args['name'].startswith('lesioned_retrain_plates'):
         lesioned_retrain_plates_main(args, param, values)
     else:
         raise NotImplementedError()
