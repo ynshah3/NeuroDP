@@ -20,14 +20,15 @@ class FragmentsDataset(ImageFolder):
 
     def __getitem__(self, idx):
         img, label = super().__getitem__(idx)
-        return img, label, (self.percent[idx])
+        return img, label, self.percent[idx]
 
 
 def fragments_dataset(image_dir='./datasets/fragments/'):
     transform = v2.Compose([
         v2.Resize((224, 224)),
         v2.PILToTensor(),
-        v2.ToDtype(torch.float32, scale=True)
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
     train_dataset = ImageFolder(root=image_dir + 'train/', transform=transform)
@@ -41,7 +42,7 @@ if __name__ == '__main__':
     train_loader = DataLoader(dataset=train_dataset, batch_size=5, num_workers=0, shuffle=True)
     test_loader = DataLoader(dataset=test_dataset, batch_size=5, num_workers=0, shuffle=True)
     train_images, train_targets = next(iter(train_loader))
-    test_images, test_targets, (test_percent) = next(iter(test_loader))
+    test_images, test_targets, test_percent = next(iter(test_loader))
     plt.figure(figsize=(9, 3))
     for i in range(5):
         plt.subplot(2, 5, i + 1)

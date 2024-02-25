@@ -1,6 +1,8 @@
 from file_utils import read_file_in_dir
 from mains.healthy_plates import healthy_plates_main
 from mains.lesioned_plates import lesioned_plates_main
+from mains.healthy_ops import healthy_ops_main
+from mains.lesioned_ops import lesioned_ops_main
 from mains.lesioned_retrain_plates import lesioned_retrain_plates_main
 import sys
 
@@ -20,5 +22,9 @@ if __name__ == '__main__':
         lesioned_plates_main(args, param, values)
     elif args['name'].startswith('lesioned_retrain_plates'):
         lesioned_retrain_plates_main(args, param, values)
+    elif args['name'] == 'healthy_ops':
+        healthy_ops_main(args, param, values)
+    elif args['name'] == 'lesioned_ops':
+        lesioned_ops_main(args, param, values)
     else:
         raise NotImplementedError()
