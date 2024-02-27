@@ -1,0 +1,14 @@
+{
+  "name": "healthy_lfw",
+  "dataset": "fragments",
+  "runs": 10,
+  "epochs": 15,
+  "bz": 32,
+  "num_workers": 2,
+  "min_faces_per_person": 50,
+  "lr": 1e-2,
+  "weight_decay": 1e-3,
+  "beta1": 0.9,
+  "beta2": 0.999,
+  "eps": 1e-08
+}
