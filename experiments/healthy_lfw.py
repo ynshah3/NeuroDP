@@ -72,7 +72,6 @@ class HealthyLFWExperiment:
     def train(self, loader):
         self.model.train()
         for inputs, targets in tqdm.tqdm(loader, desc='Training'):
-            n += 1
             inputs, targets = inputs.to(self.device), targets.to(self.device)
             self.optimizer.zero_grad()
             loss, _ = self.compute_metrics(inputs, targets)
