@@ -46,10 +46,13 @@ def lfw_people_dataset(min_faces_per_person=50):
 
     target_names = lfw_people.target_names
     n_classes = target_names.shape[0]
+    print(f'Number of classes: {n_classes}')
+    print(f'Classes: {target_names}')
+    print(f'Number of samples: {len(lfw_people.images)}')
     return train_dataset, test_dataset, n_classes
 
 if __name__ == '__main__':
-    train_dataset, test_dataset, n_classes = lfw_people_dataset(min_faces_per_person=50)
+    train_dataset, test_dataset, n_classes = lfw_people_dataset(min_faces_per_person=200)
     train_loader = DataLoader(dataset=train_dataset, batch_size=5, num_workers=0, shuffle=True)
     test_loader = DataLoader(dataset=test_dataset, batch_size=5, num_workers=0, shuffle=True)
     train_images, train_targets = next(iter(train_loader))

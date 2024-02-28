@@ -26,6 +26,7 @@ class HealthyLFWExperiment:
 
         num_features = self.model.module.decoder.linear.in_features
         self.model.module.decoder.linear = nn.Linear(num_features, num_classes)
+        print(f'number of classes in model: {num_classes}')
 
         # train linear probe
         for param in self.model.module.decoder.linear.parameters():
