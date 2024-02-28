@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import numpy as np
+import tqdm
 from cornet_s import CORnet_S
 
 
@@ -71,9 +71,7 @@ class HealthyLFWExperiment:
 
     def train(self, loader):
         self.model.train()
-        n = 0
-        for inputs, targets in loader:
-            print(f"training input {n}")
+        for inputs, targets in tqdm.tqdm(loader, desc='Training'):
             n += 1
             inputs, targets = inputs.to(self.device), targets.to(self.device)
             self.optimizer.zero_grad()
