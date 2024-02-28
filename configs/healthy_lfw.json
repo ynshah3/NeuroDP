@@ -1,6 +1,6 @@
 {
   "name": "healthy_lfw",
-  "dataset": "fragments",
+  "dataset": "lfw",
   "runs": 10,
   "epochs": 15,
   "bz": 32,
