@@ -25,6 +25,7 @@ def healthy_lfw_experiment(args, param, values):
 
             fpath_val_loss = dpath + str(run) + '_val_loss.txt'
             fpath_val_bacc = dpath + str(run) + '_val_bacc.txt'
+            fpath_val_class_metrics = dpath + str(run) + '_val_class_metrics.txt'
             min_faces_per_person = args['min_faces_per_person']
             train_val_dataset, test_dataset, n_classes = lfw_people_dataset(min_faces_per_person=min_faces_per_person)
             train_val_labels = [label for _, label in train_val_dataset]
@@ -42,9 +43,10 @@ def healthy_lfw_experiment(args, param, values):
                 print('\t\tFold %d' % fold)
 
                 exp = HealthyLFWExperiment(args, n_classes)
-                metrics = exp.run(train_loader, val_loader, test_loader)
+                metrics, class_metrics = exp.run(train_loader, val_loader, test_loader)
                 log_to_file(fpath_val_loss, ','.join(format(x, ".4f") for x in metrics['val_loss']))
                 log_to_file(fpath_val_bacc, ','.join(format(x, ".4f") for x in metrics['val_bacc']))
+                log_to_file(fpath_val_class_metrics, ','.join(format(x, ".4f") for x in class_metrics))
                 fold += 1
             run /= 5.0
             lfw_runs.append(run)

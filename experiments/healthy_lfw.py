@@ -1,3 +1,4 @@
+from collections import defaultdict
 import torch
 import torch.nn as nn
 import tqdm
@@ -49,31 +50,41 @@ class HealthyLFWExperiment:
 
         for epoch in range(self.epochs):
             self.train(train_loader)
-            val_metrics = self.test(val_loader)
+            val_metrics, _ = self.test(val_loader)
             metrics['val_loss'].append(val_metrics[0])
             metrics['val_bacc'].append(val_metrics[1])
             print(f'\t\t\tEpoch {epoch + 1}: val_loss={val_metrics[0]}, val_bacc={val_metrics[1]}')
 
             self.lr_scheduler.step()
 
-        loss, acc = self.test(test_loader)
-        print(f'\t\t\tTest loss: {loss:.4f}, Test Acc: {acc:.4f}')
+        _, class_metrics = self.test(test_loader)
+        print(f'\t\t\tTest class metrics: {class_metrics}')
 
-        return metrics
+        return metrics, class_metrics
 
     def compute_metrics(self, inputs, targets):
         output = self.model(inputs)
         loss = self.criterion(output, targets)
         predicted = torch.argmax(output, 1)
         correct = (predicted == targets).sum().item()
-        return loss, correct / len(targets)
+
+        # Calculate per-class accuracy details
+        correct_per_class = defaultdict(int)
+        total_per_class = defaultdict(int)
+        for label, pred in zip(targets, predicted):
+            total_per_class[label.item()] += 1
+            if label == pred:
+                correct_per_class[label.item()] += 1
+
+        return loss, correct / len(targets), correct_per_class, total_per_class
+
 
     def train(self, loader):
         self.model.train()
         for inputs, targets in tqdm.tqdm(loader, desc='Training'):
             inputs, targets = inputs.to(self.device), targets.to(self.device)
             self.optimizer.zero_grad()
-            loss, _ = self.compute_metrics(inputs, targets)
+            loss, _, _, _ = self.compute_metrics(inputs, targets)
 
             loss.backward()
             self.optimizer.step()
@@ -83,12 +94,20 @@ class HealthyLFWExperiment:
 
         test_loss = 0.0
         test_bacc = 0.0
+        correct_per_class = defaultdict(int)
+        total_per_class = defaultdict(int)
 
         with torch.no_grad():
             for inputs, targets in loader:
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
-                loss, bacc = self.compute_metrics(inputs, targets)
+                loss, bacc, correct_pc, total_pc = self.compute_metrics(inputs, targets)
                 test_loss += loss.detach().cpu().item()
                 test_bacc += bacc
+                for key, value in correct_pc.items():
+                    correct_per_class[key] += value
+                for key, value in total_pc.items():
+                    total_per_class[key] += value
 
-        return test_loss / len(loader), test_bacc / len(loader)
+        class_metrics = [(person_id, total_per_class[person_id], correct_per_class[person_id] / total_per_class[person_id] if total_per_class[person_id] else 0) for person_id in sorted(total_per_class.keys())]
+
+        return (test_loss / len(loader), test_bacc / len(loader)), class_metrics
