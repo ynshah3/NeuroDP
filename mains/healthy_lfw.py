@@ -18,8 +18,6 @@ def healthy_lfw_experiment(args, param, values):
         dpath = dpath_parent + str(value) + '/'
         os.makedirs(dpath, exist_ok=True)
 
-        lfw_runs = []
-
         for run in range(runs):
             print(f'\trun #{run + 1}\n\t-------')
 
@@ -46,7 +44,5 @@ def healthy_lfw_experiment(args, param, values):
                 metrics, class_metrics = exp.run(train_loader, val_loader, test_loader)
                 log_to_file(fpath_val_loss, ','.join(format(x, ".4f") for x in metrics['val_loss']))
                 log_to_file(fpath_val_bacc, ','.join(format(x, ".4f") for x in metrics['val_bacc']))
-                log_to_file(fpath_val_class_metrics, ','.join(format(x, ".4f") for x in class_metrics))
+                log_to_file(fpath_val_class_metrics, ','.join(format(x, ".4f") for x in str(class_metrics)))
                 fold += 1
-            run /= 5.0
-            lfw_runs.append(run)
