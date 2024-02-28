@@ -26,7 +26,6 @@ class HealthyLFWExperiment:
 
         num_features = self.model.module.decoder.linear.in_features
         self.model.module.decoder.linear = nn.Linear(num_features, num_classes)
-        print(f'number of classes in model: {num_classes}')
 
         # train linear probe
         for param in self.model.module.decoder.linear.parameters():
@@ -92,4 +91,4 @@ class HealthyLFWExperiment:
                 test_loss += loss.detach().cpu().item()
                 test_bacc += bacc
 
-        return test_loss / len(loader), test_bacc / len(loader.dataset)
+        return test_loss / len(loader), test_bacc / len(loader)
