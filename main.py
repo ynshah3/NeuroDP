@@ -6,6 +6,7 @@ from mains.healthy_ops import healthy_ops_main
 from mains.lesioned_ops import lesioned_ops_main
 from mains.healthy_lfw_people import healthy_lfw_people_main
 from mains.lesioned_retrain_plates import lesioned_retrain_plates_main
+from mains.healthy_lfw_pairs import healthy_lfw_pairs_main
 import sys
 
 
@@ -30,6 +31,8 @@ if __name__ == '__main__':
         healthy_lfw_people_main(args, param, values)
     elif args['name'] == 'lesioned_lfw_people':
         lesioned_lfw_people_main(args, param, values)
+    elif args['name'] == 'healthy_lfw_pairs':
+        healthy_lfw_pairs_main(args, param, values)
     elif args['name'] == 'lesioned_ops':
         lesioned_ops_main(args, param, values)
     else:
