@@ -26,7 +26,7 @@ class LFWPeopleDataset(Dataset):
 
 
 def lfw_people_dataset(min_faces_per_person=50):
-    lfw_people = fetch_lfw_people(min_faces_per_person=min_faces_per_person, resize=0.4, color=True, funneled=True)
+    lfw_people = fetch_lfw_people(min_faces_per_person=min_faces_per_person, resize=1, color=True, funneled=True)
     X = lfw_people.images
     y = lfw_people.target
     # Split the dataset
