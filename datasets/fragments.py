@@ -16,7 +16,7 @@ class FragmentsDataset(ImageFolder):
         for filename in self.imgs:
             file_name = os.path.basename(filename[0])
             _, percent = os.path.splitext(file_name)[0].split('_')
-            self.percent.append(percent)
+            self.percent.append(float(percent))
 
     def __getitem__(self, idx):
         img, label = super().__getitem__(idx)
@@ -27,7 +27,7 @@ def fragments_dataset(image_dir='./datasets/fragments/'):
     transform = v2.Compose([
         v2.Resize((224, 224)),
         v2.PILToTensor(),
-        v2.ToDtype(torch.float32, scale=True),
+        v2.ToDtype(torch.float32),
         v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 

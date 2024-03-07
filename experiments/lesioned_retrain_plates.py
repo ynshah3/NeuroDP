@@ -87,14 +87,6 @@ class LesionedRetrainPlatesExperiment:
             metrics['tau_lesioned'].append(tau)
             metrics['p_lesioned'].append(p_value)
 
-            if self.retrain_cortex:
-                for param in self.model.parameters():
-                    param.requires_grad = True
-            else:
-                for conv_layer in conv_layers:
-                    for param in conv_layer.parameters():
-                        param.requires_grad = True
-
             self.retrain(loaders[2])
 
             torch.save(self.model.state_dict(), path + '_ckpt_retrained_' + str(i) + '.pt')
@@ -119,32 +111,51 @@ class LesionedRetrainPlatesExperiment:
                 val_loader = DataLoader(val_dataset, batch_size=int(self.args['bz']), num_workers=self.args['num_workers'],
                                         shuffle=False)
                 loss, acc = self.fit_probe(train_loader, val_loader, test_loader)
+                print(f'\t\t\tTest loss: {loss}, Test Acc: {acc}')
                 metrics['loss_retrained'][i] += loss
                 metrics['bacc_retrained'][i] += acc
 
                 fold += 1
 
-            metrics['loss_retrained'] /= 5.
-            metrics['bacc_retrained'] /= 5.
+        metrics['loss_retrained'] /= 5.
+        metrics['bacc_retrained'] /= 5.
 
         return metrics
 
     def retrain(self, train_loader):
+        for param in self.model.parameters():
+            param.requires_grad = True
+
         for param in self.head.parameters():
             param.requires_grad = True
 
         head_optimizer = torch.optim.SGD(
-            list(filter(lambda p: p.requires_grad, self.head.parameters())),
-            lr=self.args['lr_head'],
+                list(filter(lambda p: p.requires_grad, self.head.parameters())) + list(filter(lambda p: p.requires_grad, self.model.parameters())),
+            lr=0.001,
             momentum=0.9,
             weight_decay=self.args['weight_decay'],
         )
 
-        head_lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=head_optimizer, step_size=1024, gamma=0.1)
-
         print('\t\t\tRetraining...')
 
-        self.train(self.head, train_loader, head_optimizer, head_lr_scheduler, verbose=True, iter_stop=self.retrain_epochs)
+        iterator = iter(train_loader)    
+        for it in range(self.retrain_epochs):
+            try:
+                inputs, targets = next(iterator)
+            except StopIteration:
+                iterator = iter(train_loader)
+                inputs, targets = next(iterator)
+
+            inputs, targets = inputs.to(self.device), targets.to(self.device)
+
+            head_optimizer.zero_grad()
+
+            loss, acc = self.compute_metrics(self.head, inputs, targets)
+
+            print(f'\t\t\tIter {it + 1}: train_loss={loss:.4f}, train_bacc={acc:.4f}')
+            
+            loss.backward()
+            head_optimizer.step()
 
     def fit_probe(self, train_loader, val_loader, test_loader):
         for param in self.model.parameters():
@@ -183,31 +194,20 @@ class LesionedRetrainPlatesExperiment:
 
         return loss, bacc
 
-    def train(self, head, loader, optimizer, lr_scheduler=None, verbose=False, iter_stop=None):
+    def train(self, head, loader, optimizer):
         head.train()
-        self.model.train()
-        self.head.train()
-        if verbose:
-            log_every = 1 if iter_stop <= 32 else iter_stop // 32
+        self.model.eval()
+        self.head.eval()
 
         for it, (inputs, targets) in enumerate(loader):
-            if it == iter_stop:
-                break
-
             inputs, targets = inputs.to(self.device), targets.to(self.device)
 
             optimizer.zero_grad()
 
             loss, acc = self.compute_metrics(head, inputs, targets)
 
-            if verbose and (it % log_every == 0):
-                print(f'\t\t\tIter {it + 1}: train_loss={loss:.4f}, train_bacc={acc:.4f}')
-            
             loss.backward()
             optimizer.step()
-
-            if lr_scheduler:
-                lr_scheduler.step()
 
     def test(self, head, loader, is_val=True):
         self.model.eval()

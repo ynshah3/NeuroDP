@@ -10,7 +10,7 @@ def lesioned_ops_main(args, param, values):
     dpath_parent = '/vision/u/ynshah/NeuroDP/runs/' + args["name"] + '/' + param + '/'
 
     runs = args['runs']
-    for value in np.array(values.split(',')).astype(float):
+    for value in np.array(values.split(',')):
         hparams = {param: value.item()}
         args[param] = value.item()
         print(hparams)

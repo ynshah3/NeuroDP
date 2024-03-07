@@ -33,7 +33,7 @@ class HealthyOpsExperiment:
 
         self.model.to(self.device).float()
 
-        self.epochs = args['epochs']
+        self.epochs = int(args['epochs'])
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(
             list(filter(lambda p: p.requires_grad, self.model.parameters())),
@@ -69,7 +69,7 @@ class HealthyOpsExperiment:
 
         if is_test:
             for i in range(len(predicted)):
-                percent_index = percents[i] * 100 - 1
+                percent_index = int(percents[i] * 100 - 1)
                 if predicted[i] == targets[i]:
                     op_percent_acc[percent_index] += 1
 
@@ -123,6 +123,9 @@ class HealthyOpsExperiment:
                         test_loss += loss
                         test_bacc += b_acc
 
+        if not is_val:
+            print(op_percent_acc/25)
+        
         return test_loss.detach().cpu().item() / len(loader), \
             test_bacc / len(loader.dataset), \
             op_percent_acc / 25
