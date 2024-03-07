@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.model_selection import StratifiedKFold
 from torch.utils.data import Subset, DataLoader
 from datasets.lfw_people import lfw_people_dataset
-from experiments.lesioned_lfw_people import LesionedLFWExperiment
+from experiments.lesioned_lfw_people import LesionedLFWPeopleExperiment
 from file_utils import *
 
 def lesioned_lfw_people_main(args, param, values):
@@ -28,7 +28,7 @@ def lesioned_lfw_people_main(args, param, values):
                 val_loader = DataLoader(val_dataset, batch_size=int(args['bz']), num_workers=args['num_workers'], shuffle=False)
                 test_loader = DataLoader(test_dataset, batch_size=int(args['bz']), num_workers=args['num_workers'], shuffle=False)
                 print('\t\tFold %d' % fold)
-                exp = LesionedLFWExperiment(args, n_classes)
+                exp = LesionedLFWPeopleExperiment(args, n_classes)
                 metrics = exp.run(train_loader, val_loader, test_loader)
                 for item in metrics.items():
                     fpath_val_loss = dpath + str(run) + '_' + str(item[0]) + '_loss.txt'

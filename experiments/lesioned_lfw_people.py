@@ -13,7 +13,7 @@ def get_model(map_location=None):
     model.load_state_dict(ckpt_data['state_dict'])
     return model
 
-class LesionedLFWExperiment:
+class LesionedLFWPeopleExperiment:
     def __init__(self, args, num_classes):
         self.args = args
         self.num_classes = num_classes

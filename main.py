@@ -4,7 +4,7 @@ from mains.lesioned_lfw_people import lesioned_lfw_people_main
 from mains.lesioned_plates import lesioned_plates_main
 from mains.healthy_ops import healthy_ops_main
 from mains.lesioned_ops import lesioned_ops_main
-from mains.healthy_lfw import healthy_lfw_people_main
+from mains.healthy_lfw_people import healthy_lfw_people_main
 from mains.lesioned_retrain_plates import lesioned_retrain_plates_main
 import sys
 
