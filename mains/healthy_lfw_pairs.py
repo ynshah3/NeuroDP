@@ -4,7 +4,7 @@ from datasets.lfw_pairs import lfw_pairs_dataset
 from experiments.healthy_lfw_pairs import HealthyLFWPairsExperiment
 from file_utils import *
 
-def lfw_pairs_main(args, param, values):
+def healthy_lfw_pairs_main(args, param, values):
     dpath_parent = './runs/' + args["name"] + '/' + param + '/'
     runs = args['runs']
     for value in np.array(values.split(',')).astype(float):
@@ -24,11 +24,7 @@ def lfw_pairs_main(args, param, values):
             train_loader = DataLoader(train_dataset, batch_size=int(args['bz']), num_workers=args['num_workers'], shuffle=True)
             test_loader = DataLoader(test_dataset, batch_size=int(args['bz']), num_workers=args['num_workers'], shuffle=False)
             
-            fold = 0
-            for fold_dataset in lfw_pairs_dataset(subset='10_folds'):
-                print('\t\tFold %d' % fold)
-                exp = HealthyLFWPairsExperiment(args)
-                metrics = exp.run(train_loader, fold_dataset, test_loader)
-                log_to_file(fpath_val_loss, ','.join(format(x, ".4f") for x in metrics['val_loss']))
-                log_to_file(fpath_val_acc, ','.join(format(x, ".4f") for x in metrics['val_acc']))
-                fold += 1
+            exp = HealthyLFWPairsExperiment(args)
+            metrics = exp.run(train_loader, test_loader, None)
+            log_to_file(fpath_val_loss, ','.join(format(x, ".4f") for x in metrics['val_loss']))
+            log_to_file(fpath_val_acc, ','.join(format(x, ".4f") for x in metrics['val_acc']))
