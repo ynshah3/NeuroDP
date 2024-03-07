@@ -1,6 +1,6 @@
 {
-  "name": "healthy_lfw",
-  "dataset": "lfw",
+  "name": "healthy_lfw_people",
+  "dataset": "lfw_people",
   "runs": 10,
   "epochs": 35,
   "bz": 32,

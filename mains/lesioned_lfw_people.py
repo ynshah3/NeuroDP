@@ -1,11 +1,11 @@
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
 from torch.utils.data import Subset, DataLoader
-from datasets.lfw import lfw_people_dataset
-from experiments.lesioned_lfw import LesionedLFWExperiment
+from datasets.lfw_people import lfw_people_dataset
+from experiments.lesioned_lfw_people import LesionedLFWExperiment
 from file_utils import *
 
-def lesioned_lfw_main(args, param, values):
+def lesioned_lfw_people_main(args, param, values):
     dpath_parent = './runs/' + args["name"] + '/' + param + '/'
     runs = args['runs']
     for value in np.array(values.split(',')).astype(int):

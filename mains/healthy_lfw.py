@@ -1,12 +1,12 @@
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
 from torch.utils.data import Subset, DataLoader
-from datasets.lfw import lfw_people_dataset
-from experiments.healthy_lfw import HealthyLFWExperiment
+from datasets.lfw_people import lfw_people_dataset
+from experiments.healthy_lfw_people import HealthyLFWPeopleExperiment
 from file_utils import *
 
 
-def healthy_lfw_experiment(args, param, values):
+def healthy_lfw_people_main(args, param, values):
     dpath_parent = './runs/' + args["name"] + '/' + param + '/'
 
     runs = args['runs']
@@ -40,7 +40,7 @@ def healthy_lfw_experiment(args, param, values):
 
                 print('\t\tFold %d' % fold)
 
-                exp = HealthyLFWExperiment(args, n_classes)
+                exp = HealthyLFWPeopleExperiment(args, n_classes)
                 metrics, class_metrics = exp.run(train_loader, val_loader, test_loader)
                 log_to_file(fpath_val_loss, ','.join(format(x, ".4f") for x in metrics['val_loss']))
                 log_to_file(fpath_val_bacc, ','.join(format(x, ".4f") for x in metrics['val_bacc']))

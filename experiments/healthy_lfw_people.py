@@ -15,7 +15,7 @@ def get_model(map_location=None):
     return model
 
 
-class HealthyLFWExperiment:
+class HealthyLFWPeopleExperiment:
     def __init__(self, args, num_classes):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f'\t\tusing {self.device}')
