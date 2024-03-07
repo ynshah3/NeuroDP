@@ -24,13 +24,15 @@ def lesioned_retrain_plates_main(args, param, values):
             train_val_dataset, test_dataset = plates_dataset('./datasets/plates/')
             imagenet_train, imagenet_val = imagenet_dataset('/vision/group/ImageNet_2012/')
 
-            imgnet_train_loader = DataLoader(imagenet_train, batch_size=256, num_workers=args['num_workers'], shuffle=True)
+            imgnet_train_loader = DataLoader(imagenet_train, batch_size=128, num_workers=2, shuffle=True)
 
             exp = LesionedRetrainPlatesExperiment(args)
             metrics = exp.run(
                 [train_val_dataset, test_dataset, imgnet_train_loader],
                 dpath + str(run)
             )
+
+            print(metrics)
 
             for item in metrics.items():
                 fpath = dpath + str(run) + '_' + item[0] + '.txt'
