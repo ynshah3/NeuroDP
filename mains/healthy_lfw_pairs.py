@@ -6,7 +6,7 @@ from file_utils import *
 
 
 def healthy_lfw_pairs_main(args, param, values):
-    dpath_parent = './runs/' + args["name"] + '/' + param + '/'
+    dpath_parent = '/vision/u/ynshah/NeuroDP/runs/' + args["name"] + '/' + param + '/'
     runs = args['runs']
 
     for value in np.array(values.split(',')).astype(float):
@@ -27,7 +27,7 @@ def healthy_lfw_pairs_main(args, param, values):
             
             train_loader = DataLoader(train_dataset, batch_size=int(args['bz']), num_workers=args['num_workers'], shuffle=True)
             test_loader = DataLoader(test_dataset, batch_size=int(args['bz']), num_workers=args['num_workers'], shuffle=False)
-            finetune_loader = DataLoader(finetune_dataset, batch_size=128, num_workers=args['num_workers'], shuffle=True)
+            finetune_loader = DataLoader(finetune_dataset, batch_size=32, num_workers=args['num_workers'], shuffle=True)
             
             exp = HealthyLFWPairsExperiment(args, finetune_loader)
             metrics = exp.run(train_loader, test_loader)
