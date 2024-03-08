@@ -31,7 +31,7 @@ class HealthyLFWPairsExperiment:
         for param in self.model.parameters():
             param.requires_grad = False
 
-        self.probe = nn.Linear(self.num_features, self.args['num_classes']).to(self.device).float()
+        self.probe = nn.Linear(self.num_features*4, self.args['num_classes']).to(self.device).float()
         
         for param in self.probe.parameters():
             param.requires_grad = True
@@ -41,17 +41,17 @@ class HealthyLFWPairsExperiment:
         self.optimizer = torch.optim.SGD(
             # self.model.parameters where requires_grad is True and the classifier parameters
             list(filter(lambda p: p.requires_grad, self.probe.parameters())),
-            lr=0.001,
+            lr=0.0001,
             momentum=0.9,
             weight_decay=args['weight_decay']
         )
-        self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=30)
+        self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=15)
 
     def finetune(self, finetune_loader):
         for param in self.model.parameters():
             param.requires_grad = True
 
-        head = nn.Linear(self.num_features, self.args['num_classes'])
+        head = nn.Linear(self.num_features*4, self.args['num_classes'])
         head.to(self.device).float()
 
         optimizer = torch.optim.SGD(
@@ -61,13 +61,13 @@ class HealthyLFWPairsExperiment:
             weight_decay=self.args['weight_decay'],
         )
 
-        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=5)
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=3)
 
         print('\t\tFinetuning...')
         self.model.train()
         head.train()
 
-        for epoch in range(5):
+        for epoch in range(3):
             ft_loss = 0.
             ft_acc = 0.
 
@@ -106,8 +106,12 @@ class HealthyLFWPairsExperiment:
         features1 = self.model(images1)
         features2 = self.model(images2)
         
-        diff = torch.abs(features1 - features2)
-        combined_features = torch.sqrt(diff)
+        diff = features1 - features2
+        abs_diff = torch.abs(diff)
+        sq_diff = diff ** 2
+        sqrt_abs_diff = torch.sqrt(abs_diff)
+        product = features1 * features2
+        combined_features = torch.cat((product, abs_diff, sq_diff, sqrt_abs_diff), dim=1)
         
         similarity = classifier(combined_features).squeeze()
         
