@@ -14,7 +14,7 @@ def visualize_ops_percent(ops_runs, save_path):
     plt.figure()
     mean = np.mean(ops_runs, axis=0)
     err = np.std(ops_runs, axis=0)
-    x = np.arange(1, 41)
+    x = np.arange(1, 51)
     plt.plot(x, mean, color='black')
     plt.fill_between(x, mean + err, mean - err, color='gray', alpha=0.5)
     plt.xlabel('Noise Percentage')
@@ -28,5 +28,5 @@ def visualize_ops_percent(ops_runs, save_path):
 
 
 if __name__ == '__main__':
-    data = np.random.normal(size=(10, 40), loc=0.6, scale=0.05).clip(0.0, 1.0)
+    data = np.random.normal(size=(10, 50), loc=0.6, scale=0.05).clip(0.0, 1.0)
     visualize_ops_percent(data, '../assets/sample_ops_percent_plot')

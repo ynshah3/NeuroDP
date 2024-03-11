@@ -27,7 +27,7 @@ def healthy_ops_main(args, param, values):
             fpath_val_loss = dpath + str(run) + '_val_loss.txt'
             fpath_val_bacc = dpath + str(run) + '_val_bacc.txt'
 
-            ops_run = np.zeros(40)
+            ops_run = np.zeros(50)
 
             train_val_dataset, test_dataset = fragments_dataset('./datasets/fragments/')
             train_val_labels = [label for _, label in train_val_dataset]

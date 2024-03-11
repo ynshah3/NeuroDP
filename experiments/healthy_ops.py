@@ -93,7 +93,7 @@ class HealthyOpsExperiment:
 
         test_loss = 0.0
         test_bacc = 0.0
-        op_percent_acc = np.zeros(40)
+        op_percent_acc = np.zeros(50)
 
         with torch.no_grad():
                 if is_val:
