@@ -8,3 +8,5 @@ interpreter
 .venv
 .vscode
 __pycache__
+**/*.jpg
+**/*.txt
