@@ -7,6 +7,7 @@ from mains.lesioned_ops import lesioned_ops_main
 from mains.healthy_lfw_people import healthy_lfw_people_main
 from mains.lesioned_retrain_plates import lesioned_retrain_plates_main
 from mains.healthy_lfw_pairs import healthy_lfw_pairs_main
+from mains.lesioned_lfw_pairs import lesioned_lfw_pairs_main
 import sys
 
 
@@ -35,5 +36,7 @@ if __name__ == '__main__':
         healthy_lfw_pairs_main(args, param, values)
     elif args['name'] == 'lesioned_ops':
         lesioned_ops_main(args, param, values)
+    elif args['name'] == 'lesioned_lfw_pairs':
+        lesioned_lfw_pairs_main(args, param, values)
     else:
         raise NotImplementedError()

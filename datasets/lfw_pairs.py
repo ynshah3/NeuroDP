@@ -4,6 +4,22 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import v2
 from matplotlib import pyplot as plt
 
+class LFWPairsWithID(LFWPairs):
+    def __init__(self, root: str, split: str = "10fold", image_set: str = "funneled", transform = None, target_transform = None, download: bool = False) -> None:
+        super().__init__(root, split, image_set, transform, target_transform, download)
+    
+    def __getitem__(self, index: int):
+        """
+        Args:
+            index (int): Index
+
+        Returns:
+            tuple: (image1, image2, target, pair_id) where target is `0` for different identities and `1` for the same identities, and pair_id is the unique identifier for the pair.
+        """
+        img1, img2, target = super().__getitem__(index)
+        pair_id = index  # Use the index as a unique identifier
+        print(f'target: {target}, pair_id: {pair_id}')
+        return img1, img2, target, pair_id
 
 def lfw_pairs_dataset(subset='train'):
     transform = v2.Compose([
@@ -14,8 +30,8 @@ def lfw_pairs_dataset(subset='train'):
         v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    dataset = LFWPairs(root='/vision/group/LFW/', split=subset, transform=transform, download=True)
-
+    dataset = LFWPairs(root='./datasets/lfw', split=subset, transform=transform, download=True)
+    dataset.pair_indices = list(range(len(dataset)))  # Add pair indices to the dataset
     return dataset
 
 

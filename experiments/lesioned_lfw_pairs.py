@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from cornet_s import CORnet_S
 import torch.nn.functional as F
+import torch.nn.utils.prune as prune
 
 def get_model(map_location=None):
     model_hash = '1d3f7974'
@@ -12,13 +13,14 @@ def get_model(map_location=None):
     model.load_state_dict(ckpt_data['state_dict'])
     return model
 
-class HealthyLFWPairsExperiment:
+class LesionedLFWPairsExperiment:
     def __init__(self, args, finetune_loader):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f'\t\tusing {self.device}')
         self.args = args
         
         self.model = get_model(map_location=self.device)
+        self.lesion_model()
         
         # Replace the last linear layer with a linear probe
         self.num_features = self.model.module.decoder.linear.in_features
@@ -38,13 +40,22 @@ class HealthyLFWPairsExperiment:
         self.epochs = int(args['epochs'])
         self.criterion = nn.BCELoss()
         self.optimizer = torch.optim.SGD(
-            # self.model.parameters where requires_grad is True and the classifier parameters
             list(filter(lambda p: p.requires_grad, self.probe.parameters())),
             lr=0.0001,
             momentum=0.9,
             weight_decay=args['weight_decay']
         )
         self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=15)
+        self.lesion_stats = {'lesion_amount': 0.2, 'lesioned_layers': []}
+
+    def lesion_model(self):
+        lesioned_layers = []
+        for name, module in self.model.named_modules():
+            if isinstance(module, torch.nn.Conv2d):
+                prune.random_unstructured(module, name='weight', amount=self.lesion_stats['lesion_amount'])
+                prune.remove(module, 'weight')
+                lesioned_layers.append(name)
+        self.lesion_stats['lesioned_layers'] = lesioned_layers
 
     def finetune(self, finetune_loader):
         for param in self.model.parameters():
@@ -70,7 +81,7 @@ class HealthyLFWPairsExperiment:
             ft_loss = 0.
             ft_acc = 0.
 
-            for images1, images2, targets    in finetune_loader:
+            for images1, images2, targets in finetune_loader:
                 images1, images2, targets = images1.to(self.device), images2.to(self.device), targets.to(self.device).float()
 
                 optimizer.zero_grad()
@@ -99,6 +110,8 @@ class HealthyLFWPairsExperiment:
             metrics['pair_indices'].extend(val_metrics[3])
             print(f'\t\t\tEpoch {epoch + 1}: val_loss={val_metrics[0]:.4f}, val_acc={val_metrics[1]:.4f}')
             self.lr_scheduler.step()
+
+        metrics['lesion_stats'] = self.lesion_stats
         # test_metrics = self.test(test_loader)
         # print(f'\t\t\tTest loss: {test_metrics[0]}, Test Acc: {test_metrics[1]}')
         return metrics
