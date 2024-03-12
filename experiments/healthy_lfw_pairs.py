@@ -70,14 +70,14 @@ class HealthyLFWPairsExperiment:
             ft_loss = 0.
             ft_acc = 0.
 
-            for images1, images2, targets    in finetune_loader:
+            for images1, images2, targets, _ in finetune_loader:
                 images1, images2, targets = images1.to(self.device), images2.to(self.device), targets.to(self.device).float()
 
                 optimizer.zero_grad()
 
                 loss, acc = self.compute_metrics(head, images1, images2, targets)
                 ft_loss += loss
-                ft_acc += acc
+                ft_acc += acc.sum().item()
 
                 loss.backward()
                 optimizer.step()
@@ -118,9 +118,9 @@ class HealthyLFWPairsExperiment:
         
         loss = F.binary_cross_entropy_with_logits(similarity, labels)
         predicted = (F.sigmoid(similarity) > 0.5).long()
-        accuracy = (predicted.squeeze() == labels).float().sum()
+        accuracies = (predicted.squeeze() == labels).float()
         
-        return loss, accuracy
+        return loss, accuracies
 
     def train(self, loader):
         self.probe.train()
@@ -149,8 +149,8 @@ class HealthyLFWPairsExperiment:
                 
                 loss, acc = self.compute_metrics(self.probe, image1, image2, labels)
                 test_loss += loss
-                test_acc += acc
-                pair_accs.append(acc.item())
+                test_acc += acc.sum().item()
+                pair_accs.extend(acc.tolist())
                 pair_indices.extend(indices.tolist())
         
         return test_loss.detach().cpu().item() / len(loader), test_acc / len(loader.dataset), pair_accs, pair_indices

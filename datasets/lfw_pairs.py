@@ -4,22 +4,14 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import v2
 from matplotlib import pyplot as plt
 
-class LFWPairsWithID(LFWPairs):
-    def __init__(self, root: str, split: str = "10fold", image_set: str = "funneled", transform = None, target_transform = None, download: bool = False) -> None:
-        super().__init__(root, split, image_set, transform, target_transform, download)
-    
-    def __getitem__(self, index: int):
-        """
-        Args:
-            index (int): Index
+def dataset_with_indices(cls):
+    def __getitem__(self, index):
+        img1, img2, target = cls.__getitem__(self, index)
+        return img1, img2, target, index
 
-        Returns:
-            tuple: (image1, image2, target, pair_id) where target is `0` for different identities and `1` for the same identities, and pair_id is the unique identifier for the pair.
-        """
-        img1, img2, target = super().__getitem__(index)
-        pair_id = index  # Use the index as a unique identifier
-        print(f'target: {target}, pair_id: {pair_id}')
-        return img1, img2, target, pair_id
+    return type(cls.__name__, (cls,), {
+        '__getitem__': __getitem__,
+    })
 
 def lfw_pairs_dataset(subset='train'):
     transform = v2.Compose([
@@ -29,9 +21,8 @@ def lfw_pairs_dataset(subset='train'):
         v2.Normalize(mean=[0, 0, 0], std=[255.0, 255.0, 255.0]),
         v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
-
-    dataset = LFWPairs(root='./datasets/lfw', split=subset, transform=transform, download=True)
-    dataset.pair_indices = list(range(len(dataset)))  # Add pair indices to the dataset
+    LFWwithIndices = dataset_with_indices(LFWPairs)
+    dataset = LFWwithIndices(root='./datasets/lfw', split=subset, transform=transform, download=True)
     return dataset
 
 
