@@ -141,7 +141,6 @@ class LesionedLFWPairsExperiment:
 
         metrics['loss'] /= 10.
         metrics['acc'] /= 10.
-        metrics['per_class_acc'] /= 10.
 
         return metrics
 
