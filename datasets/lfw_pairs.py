@@ -18,7 +18,6 @@ class LFWPairsWithID(LFWPairs):
         """
         img1, img2, target = super().__getitem__(index)
         pair_id = index  # Use the index as a unique identifier
-        print(f'target: {target}, pair_id: {pair_id}')
         return img1, img2, target, pair_id
 
 def lfw_pairs_dataset(subset='train'):
@@ -30,7 +29,7 @@ def lfw_pairs_dataset(subset='train'):
         v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    dataset = LFWPairs(root='./datasets/lfw', split=subset, transform=transform, download=True)
+    dataset = LFWPairsWithID(root='/vision/group/LFW/', split=subset, transform=transform, download=True)
     dataset.pair_indices = list(range(len(dataset)))  # Add pair indices to the dataset
     return dataset
 

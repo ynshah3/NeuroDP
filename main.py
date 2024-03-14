@@ -36,7 +36,7 @@ if __name__ == '__main__':
         healthy_lfw_pairs_main(args, param, values)
     elif args['name'] == 'lesioned_ops':
         lesioned_ops_main(args, param, values)
-    elif args['name'] == 'lesioned_lfw_pairs':
+    elif args['name'].startswith('lesioned_lfw_pairs'):
         lesioned_lfw_pairs_main(args, param, values)
     else:
         raise NotImplementedError()

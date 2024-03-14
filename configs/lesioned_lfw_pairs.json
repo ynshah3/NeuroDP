@@ -1,10 +1,12 @@
 {
-  "name": "lesioned_lfw_pairs",
+  "name": "lesioned_lfw_pairs_0",
   "dataset": "lfw_pairs",
   "runs": 1,
-  "epochs": 15,
+  "probe_epochs": 15,
+  "lesion_iters": 15,
+  "region_idx": 0,
   "bz": 32,
-  "num_workers": 2,
+  "num_workers": 16,
   "num_classes": 1,
   "lr": 1e-2,
   "weight_decay": 1e-3,
@@ -12,3 +14,4 @@
   "beta2": 0.999,
   "eps": 1e-08
 }
+
