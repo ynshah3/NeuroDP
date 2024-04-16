@@ -1,9 +1,10 @@
 {
   "name": "lesioned_plates",
   "dataset": "plates",
-  "runs": 1,
+  "runs": 5,
   "probe_epochs": 15,
   "lesion_iters": 15,
+  "region_idx": 0,
   "retrain_epochs": 10,
   "bz": 32,
   "num_workers": 2,

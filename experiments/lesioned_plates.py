@@ -19,14 +19,33 @@ def get_model(map_location=None):
 
 
 class LesionedPlatesExperiment:
-    def __init__(self, args):
+    def __init__(self, args, region_idx, lesion_iter):
+        print(region_idx, lesion_iter)
         self.args = args
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f'\t\tusing {self.device}')
 
-        self.model = get_model(map_location=self.device)
+        # self.model = get_model(map_location=self.device)
+        
+        model = CORnet_S()
+        model = torch.nn.DataParallel(model)
+        regions = [model.module.V1, model.module.V2, model.module.V4, model.module.IT]
+        region = regions[region_idx]
+
+        url = f'/vision/u/ynshah/NeuroDP/runs/lesioned_retrain_plates_final/region_idx/checkpoints/{region_idx}_{lesion_iter}_4096_ckpt.pt'
+        ckpt_data = torch.load(url, map_location='cpu')
+
+        conv_layers = [module for module in region.modules() if isinstance(module, torch.nn.Conv2d)]
+        for x in conv_layers:
+            prune.random_unstructured(x, name='weight', amount=0.2)
+
+        self.model = model
+        self.model.load_state_dict(ckpt_data)
+        
         self.num_features = self.model.module.decoder.linear.in_features
         self.model.module.decoder.linear = nn.Identity()
+
+        self.model = self.model.module
         self.model.to(self.device).float()
         
         for param in self.model.parameters():
