@@ -8,15 +8,17 @@ from file_utils import log_to_file
 from visualize.rdm import get_rdm
 import torch.nn.utils.prune as prune
 from cornet_s import CORnet_S
+from cornet_z import CORnet_Z
 from torchvision.models import resnet18, ResNet18_Weights
 from tqdm import tqdm
 
 
 def get_model(map_location=None):
-    model_hash = '1d3f7974'
-    model = CORnet_S()
+    # model_hash = '1d3f7974'
+    model_hash = '5c427c9c'
+    model = CORnet_Z()
     model = torch.nn.DataParallel(model)
-    url = f'https://s3.amazonaws.com/cornet-models/cornet_s-{model_hash}.pth'
+    url = f'https://s3.amazonaws.com/cornet-models/cornet_z-{model_hash}.pth'
     ckpt_data = torch.hub.load_state_dict_from_url(url, map_location=map_location)
     model.load_state_dict(ckpt_data['state_dict'])
     return model
@@ -30,14 +32,9 @@ class LesionedRetrainPlatesExperiment:
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f'using {self.device}')
 
-        model = nn.Sequential(*list(resnet18().children())[:-2])
-        checkpoint = torch.load('resnet_trained.pt', map_location='cuda')
-        model.load_state_dict(checkpoint, strict=False)
+        model = get_model('cuda')
+        model = model.module
 
-        self.classifier = nn.Linear(512, 1000).to(self.device).float()
-        checkpoint = torch.load('classifier_trained.pt', map_location='cuda')
-        self.classifier.load_state_dict(checkpoint, strict=False)
-        
         for param in model.parameters():
             param.requires_grad = True
 
@@ -46,8 +43,9 @@ class LesionedRetrainPlatesExperiment:
         self.criterion = nn.CrossEntropyLoss()
 
         self.optimizer = torch.optim.SGD(
-            list(list(self.model.parameters()) + list(self.classifier.parameters())),
+            list(list(self.model.parameters()),
             lr=float(self.args['lr']),
+            momentum=0.9,
             weight_decay=self.args['weight_decay'],
         )
 
@@ -59,7 +57,8 @@ class LesionedRetrainPlatesExperiment:
 
     def run(self, train_loader, val_loader):
         print(self.model)
-        layer = self.model[self.region_idx + 4]
+        layers = [self.model.V1, self.model.V2, self.model.V4, self.model.IT]
+        layer = layers[self.region_idx]
         print(layer)
         conv_layers = [module for module in layer.modules() if isinstance(module, torch.nn.Conv2d)]
         print(conv_layers)
@@ -73,7 +72,7 @@ class LesionedRetrainPlatesExperiment:
         # _, acc1, acc5 = self.test(val_loader)
         # print(f'{acc1:.4f},{acc5:.4f}')
 
-        for i in range(40):
+        for i in range(50):
             print(f'Epoch {i + 1}')
 
             pruned, total = 0., 0.
