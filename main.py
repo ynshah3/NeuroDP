@@ -32,11 +32,11 @@ if __name__ == '__main__':
         healthy_lfw_people_main(args, param, values)
     elif args['name'] == 'lesioned_lfw_people':
         lesioned_lfw_people_main(args, param, values)
-    elif args['name'] == 'healthy_lfw_pairs':
+    elif args['name'].startswith('healthy_lfw_pairs'):
         healthy_lfw_pairs_main(args, param, values)
     elif args['name'] == 'lesioned_ops':
         lesioned_ops_main(args, param, values)
     elif args['name'].startswith('lesioned_lfw_pairs'):
         lesioned_lfw_pairs_main(args, param, values)
     else:
-        raise NotImplementedError()
+        lesioned_retrain_plates_main(args, param, values)

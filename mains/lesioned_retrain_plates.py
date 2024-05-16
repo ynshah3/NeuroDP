@@ -7,33 +7,16 @@ from file_utils import *
 
 
 def lesioned_retrain_plates_main(args, param, values):
-    dpath_parent = '/vision/u/ynshah/NeuroDP/runs/' + args["name"] + '/' + param + '/'
-
-    runs = args['runs']
     for value in np.array(values.split(',')):
         hparams = {param: value.item()}
         args[param] = value.item()
         print(hparams)
 
-        dpath = dpath_parent + str(value) + '/'
-        os.makedirs(dpath, exist_ok=True)
+        imagenet_train, imagenet_val = imagenet_dataset('/vision/group/ImageNet_2012/')
 
-        for run in range(runs):
-            print(f'\trun #{run + 1}\n\t-------')
+        imgnet_train_loader = DataLoader(imagenet_train, batch_size=128, num_workers=8, shuffle=True)
+        imgnet_val_loader = DataLoader(imagenet_val, batch_size=128, num_workers=8, shuffle=False)
 
-            train_val_dataset, test_dataset = plates_dataset('./datasets/plates/')
-            imagenet_train, imagenet_val = imagenet_dataset('/vision/group/ImageNet_2012/')
+        exp = LesionedRetrainPlatesExperiment(args)
+        exp.run(imgnet_train_loader, imgnet_val_loader)
 
-            imgnet_train_loader = DataLoader(imagenet_train, batch_size=128, num_workers=2, shuffle=True)
-
-            exp = LesionedRetrainPlatesExperiment(args)
-            metrics = exp.run(
-                [train_val_dataset, test_dataset, imgnet_train_loader],
-                dpath + str(run)
-            )
-
-            print(metrics)
-
-            for item in metrics.items():
-                fpath = dpath + str(run) + '_' + item[0] + '.txt'
-                log_to_file(fpath, ','.join(format(x, ".4f") for x in item[1]))

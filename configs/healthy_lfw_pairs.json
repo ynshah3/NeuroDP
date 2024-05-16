@@ -1,7 +1,7 @@
 {
-  "name": "healthy_lfw_pairs",
+  "name": "healthy_lfw_pairs_2",
   "dataset": "lfw_pairs",
-  "runs": 1,
+  "runs": 5,
   "epochs": 15,
   "bz": 32,
   "num_workers": 2,

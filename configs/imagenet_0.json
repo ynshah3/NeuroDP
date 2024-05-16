@@ -1,5 +1,5 @@
 {
-  "name": "lesioned_retrain_plates_resnet",
+  "name": "imagenet_0",
   "dataset": "plates",
   "runs": 1,
   "probe_epochs": 15,
@@ -8,9 +8,9 @@
   "region_idx": 0,
   "retrain_cortex": "true",
   "bz": 32,
-  "num_workers": 8,
+  "num_workers": 2,
   "num_classes": 10,
-  "lr": 1e-3,
+  "lr_probe": 1e-2,
   "lr_head": 1e-3,
   "weight_decay": 1e-3,
   "beta1": 0.9,

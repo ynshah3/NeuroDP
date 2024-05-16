@@ -1,6 +1,8 @@
 import math
 from collections import OrderedDict
 from torch import nn
+import torch
+from torch.nn.utils import prune
 
 
 HASH = '1d3f7974'
@@ -126,3 +128,31 @@ def CORnet_S():
             m.bias.data.zero_()
 
     return model
+
+
+def get_custom_cornet_s(region_idx, lesion_iter):
+    if lesion_iter == -1:
+        model_hash = '1d3f7974'
+        model = CORnet_S()
+        model = torch.nn.DataParallel(model)
+        url = f'https://s3.amazonaws.com/cornet-models/cornet_s-{model_hash}.pth'
+        ckpt_data = torch.hub.load_state_dict_from_url(url, map_location='cpu')
+        model.load_state_dict(ckpt_data['state_dict'])
+        return model.module
+    else:
+        model = CORnet_S()
+        model = torch.nn.DataParallel(model)
+        regions = [model.module.V1, model.module.V2, model.module.V4, model.module.IT]
+        region = regions[region_idx]
+
+        url = f'/vision/u/ynshah/NeuroDP/runs/lesioned_retrain_plates_final/region_idx/checkpoints/{region_idx}_{lesion_iter}_4096_ckpt.pt'
+        ckpt_data = torch.load(url, map_location='cpu')
+
+        conv_layers = [module for module in region.modules() if isinstance(module, torch.nn.Conv2d)]
+        for x in conv_layers:
+            prune.random_unstructured(x, name='weight', amount=0.2)
+
+        model.load_state_dict(ckpt_data)
+        model = model.module
+
+        return model

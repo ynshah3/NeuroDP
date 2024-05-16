@@ -8,6 +8,8 @@ from file_utils import log_to_file
 from visualize.rdm import get_rdm
 import torch.nn.utils.prune as prune
 from cornet_s import CORnet_S
+from torchvision.models import resnet18, ResNet18_Weights
+from tqdm import tqdm
 
 
 def get_model(map_location=None):
@@ -22,124 +24,82 @@ def get_model(map_location=None):
 
 class LesionedRetrainPlatesExperiment:
     def __init__(self, args):
+        self.region_idx = int(args['region_idx'])
+        self.lesion_iters = int(args['lesion_iters'])
         self.args = args
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        print(f'\t\tusing {self.device}')
+        print(f'using {self.device}')
 
-        self.model = get_model(map_location=self.device)
-        self.num_features = self.model.module.decoder.linear.in_features
-        self.head = self.model.module.decoder.linear.to(self.device).float()
-        self.model.module.decoder.linear = nn.Identity()
-        self.model.to(self.device).float()
+        model = nn.Sequential(*list(resnet18().children())[:-2])
+        checkpoint = torch.load('resnet_trained.pt', map_location='cuda')
+        model.load_state_dict(checkpoint, strict=False)
 
-        for param in self.model.parameters():
-            param.requires_grad = False
-
-        for param in self.head.parameters():
+        self.classifier = nn.Linear(512, 1000).to(self.device).float()
+        checkpoint = torch.load('classifier_trained.pt', map_location='cuda')
+        self.classifier.load_state_dict(checkpoint, strict=False)
+        
+        for param in model.parameters():
             param.requires_grad = True
 
-        self.probe_epochs = int(args['probe_epochs'])
-        self.lesion_iters = int(args['lesion_iters'])
-        self.retrain_epochs = int(args['retrain_epochs'])
-        self.region_idx = int(args['region_idx'])
-        self.retrain_cortex = False if args['retrain_cortex'].lower() == 'false' else True
-        print(f'\t\tretraining cortex: {self.retrain_cortex}')
+        self.model = model.to(self.device).float()
+        
         self.criterion = nn.CrossEntropyLoss()
+
+        self.optimizer = torch.optim.SGD(
+            list(list(self.model.parameters()) + list(self.classifier.parameters())),
+            lr=float(self.args['lr']),
+            weight_decay=self.args['weight_decay'],
+        )
+
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer,
+                                                                        T_max=40)
 
     def get_healthy_rdm(self, loader):
         return get_rdm(self.model, loader, self.device)
 
-    def run(self, loaders, path):
-        metrics = {
-            'loss_retrained': np.zeros(self.lesion_iters),
-            'bacc_retrained': np.zeros(self.lesion_iters),
-            'tau_lesioned': [],
-            'tau_retrained': [],
-            'p_lesioned': [],
-            'p_retrained': []
-        }
-        regions = [self.model.module.V1, self.model.module.V2, self.model.module.V4, self.model.module.IT]
-        region = regions[self.region_idx]
-        
-        test_loader = DataLoader(loaders[1], batch_size=int(self.args['bz']), num_workers=self.args['num_workers'],
-                                         shuffle=False)
+    def run(self, train_loader, val_loader):
+        print(self.model)
+        layer = self.model[self.region_idx + 4]
+        print(layer)
+        conv_layers = [module for module in layer.modules() if isinstance(module, torch.nn.Conv2d)]
+        print(conv_layers)
 
-        rdm_healthy = get_rdm(self.model, test_loader, self.device)
-        log_to_file(path + '_rdm.txt', 'rdm=' + str(rdm_healthy.tolist()))
+        for param in self.model.parameters():
+            param.requires_grad = True
 
-        conv_layers = [module for module in region.modules() if isinstance(module, torch.nn.Conv2d)]
-
-        train_val_labels = [label for _, label in loaders[0]]
-
-        for i in range(self.lesion_iters):
-            for param in self.model.parameters():
-                param.requires_grad = False
-
-            print(f'\t\tIteration {i + 1}')
-            for x in conv_layers:
-                prune.random_unstructured(x, name='weight', amount=0.2)
-
-            torch.save(self.model.state_dict(), path + '_ckpt_pruned_' + str(i) + '.pt')
+        for param in self.classifier.parameters():
+            param.requires_grad = True
             
-            rdm_pruned = get_rdm(self.model, test_loader, self.device)
-            log_to_file(path + '_rdm.txt', 'rdm_pruned_' + str(i) + '=' + str(rdm_pruned.tolist()))
-            tau, p_value = kendalltau(rdm_healthy.flatten(), rdm_pruned.flatten())
-            metrics['tau_lesioned'].append(tau)
-            metrics['p_lesioned'].append(p_value)
+        # _, acc1, acc5 = self.test(val_loader)
+        # print(f'{acc1:.4f},{acc5:.4f}')
 
-            self.retrain(loaders[2])
+        for i in range(40):
+            print(f'Epoch {i + 1}')
 
-            torch.save(self.model.state_dict(), path + '_ckpt_retrained_' + str(i) + '.pt')
+            pruned, total = 0., 0.
+            for x in conv_layers:
+                m = prune.random_unstructured(x, name='weight', amount=0.2)
+                pruned += torch.sum(m.weight_mask == 0)
+                total += torch.sum(m.weight_mask == 0) + torch.sum(m.weight_mask == 1)
 
-            rdm_retrained = get_rdm(self.model, test_loader, self.device)
-            log_to_file(path + '_rdm.txt', 'rdm_retrained_' + str(i) + '=' + str(rdm_retrained.tolist()))
-            tau, p_value = kendalltau(rdm_healthy.flatten(), rdm_retrained.flatten())
-            metrics['tau_retrained'].append(tau)
-            metrics['p_retrained'].append(p_value)
+            print(pruned / total)
+            # self.retrain(train_loader)
+            
+            # _, acc1, acc5 = self.test(val_loader)
+            # print(f'{acc1:.4f},{acc5:.4f}')
 
-            skf = StratifiedKFold(n_splits=5, shuffle=True)
+            # self.scheduler.step()
 
-            fold = 0
-            for train_idx, val_idx in skf.split(loaders[0], train_val_labels):
-                print('\t\t\tFold %d' % fold)
-
-                train_dataset = Subset(loaders[0], train_idx)
-                val_dataset = Subset(loaders[0], val_idx)
-
-                train_loader = DataLoader(train_dataset, batch_size=int(self.args['bz']), num_workers=self.args['num_workers'],
-                                          shuffle=True)
-                val_loader = DataLoader(val_dataset, batch_size=int(self.args['bz']), num_workers=self.args['num_workers'],
-                                        shuffle=False)
-                loss, acc = self.fit_probe(train_loader, val_loader, test_loader)
-                print(f'\t\t\tTest loss: {loss}, Test Acc: {acc}')
-                metrics['loss_retrained'][i] += loss
-                metrics['bacc_retrained'][i] += acc
-
-                fold += 1
-
-        metrics['loss_retrained'] /= 5.
-        metrics['bacc_retrained'] /= 5.
-
-        return metrics
 
     def retrain(self, train_loader):
         for param in self.model.parameters():
             param.requires_grad = True
 
-        for param in self.head.parameters():
+        for param in self.classifier.parameters():
             param.requires_grad = True
 
-        head_optimizer = torch.optim.SGD(
-                list(filter(lambda p: p.requires_grad, self.head.parameters())) + list(filter(lambda p: p.requires_grad, self.model.parameters())),
-            lr=0.001,
-            momentum=0.9,
-            weight_decay=self.args['weight_decay'],
-        )
-
-        print('\t\t\tRetraining...')
-
         iterator = iter(train_loader)    
-        for it in range(self.retrain_epochs):
+        for it in range(4096):
             try:
                 inputs, targets = next(iterator)
             except StopIteration:
@@ -148,14 +108,17 @@ class LesionedRetrainPlatesExperiment:
 
             inputs, targets = inputs.to(self.device), targets.to(self.device)
 
-            head_optimizer.zero_grad()
+            self.optimizer.zero_grad()
 
-            loss, acc = self.compute_metrics(self.head, inputs, targets)
+            loss, acc1, acc5 = self.compute_metrics(inputs, targets)
 
-            print(f'\t\t\tIter {it + 1}: train_loss={loss:.4f}, train_bacc={acc:.4f}')
+            if it % 200 == 0 or it == 4095:
+                print(f'\t{it + 1},{loss.item():.4f},{acc1:.4f},{acc5:.4f}')
+
+            # torch.nn.utils.clip_grad_norm(self.model.parameters(), 1.0)
             
             loss.backward()
-            head_optimizer.step()
+            self.optimizer.step()
 
     def fit_probe(self, train_loader, val_loader, test_loader):
         for param in self.model.parameters():
@@ -185,14 +148,30 @@ class LesionedRetrainPlatesExperiment:
 
         return loss, acc
 
-    def compute_metrics(self, head, inputs, targets):
-        features = self.model(inputs)
-        output = head(features)
-        loss = self.criterion(output, targets)
-        predicted = torch.argmax(output, 1)
-        bacc = (targets == predicted).sum()
+    def accuracy(self, output, target, topk=(1,5)):
+        """Computes the accuracy over the k top predictions for the specified values of k"""
+        with torch.no_grad():
+            maxk = max(topk)
+            batch_size = target.size(0)
 
-        return loss, bacc
+            _, pred = output.topk(maxk, 1, True, True)
+            pred = pred.t()
+            correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+            res = []
+            for k in topk:
+                correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
+                res.append(correct_k)
+            return res
+
+    def compute_metrics(self, inputs, targets):
+        feats = self.model(inputs)
+        feats = nn.functional.adaptive_avg_pool2d(feats, (1, 1)).flatten(1)
+        output = self.classifier(feats)
+        loss = self.criterion(output, targets)
+        top1, top5 = self.accuracy(output, targets, topk=(1, 5))
+
+        return loss, top1.item(), top5.item()
 
     def train(self, head, loader, optimizer):
         head.train()
@@ -209,39 +188,28 @@ class LesionedRetrainPlatesExperiment:
             loss.backward()
             optimizer.step()
 
-    def test(self, head, loader, is_val=True):
+    def test(self, loader, is_val=True):
         self.model.eval()
-        head.eval()
-        self.head.eval()
+        self.classifier.eval()
 
         test_loss = 0.0
-        test_bacc = 0.0
+        test_top1 = 0.0
+        test_top5 = 0.0
 
         with torch.no_grad():
-            if is_val:
-                for inputs, targets in loader:
-                    inputs, targets = inputs.to(self.device), targets.to(self.device)
+            for inputs, targets in loader:
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
 
-                    loss, b_acc = self.compute_metrics(
-                        head=head,
+                loss, top1, top5 = self.compute_metrics(
                         inputs=inputs,
                         targets=targets,
-                    )
+                )
 
-                    test_loss += loss
-                    test_bacc += b_acc
-            else:
-                for inputs, targets, _ in loader:
-                    inputs, targets = inputs.to(self.device), targets.to(self.device)
-
-                    loss, b_acc = self.compute_metrics(
-                        head=head,
-                        inputs=inputs,
-                        targets=targets
-                    )
-
-                    test_loss += loss
-                    test_bacc += b_acc
+                test_loss += loss
+                test_top1 += top1
+                test_top5 += top5
 
         return test_loss.detach().cpu().item() / len(loader), \
-               test_bacc / len(loader.dataset)
+               test_top1 / len(loader.dataset),\
+               test_top5 / len(loader.dataset)
+
