@@ -1,12 +1,12 @@
 import numpy as np
 from torch.utils.data import DataLoader, Subset
 from datasets.lfw_pairs import lfw_pairs_dataset
-from experiments.lesioned_lfw_pairs import LesionedLFWPairsExperiment
+from experiments.lesioned_lfw_pairs1 import LesionedLFWPairsExperiment
 from file_utils import *
 
 
 def lesioned_lfw_pairs_main(args, param, values):
-    dpath_parent = '/vision/u/ynshah/NeuroDP/runs/' + args["name"] + '/' + param + '/'
+    dpath_parent = './runs/' + args["name"] + '/' + param + '/'
     runs = args['runs']
 
     for value in np.array(values.split(',')):
@@ -17,7 +17,7 @@ def lesioned_lfw_pairs_main(args, param, values):
         dpath = dpath_parent + str(value) + '/'
         os.makedirs(dpath, exist_ok=True)
 
-        for run in range(2, runs+2):
+        for run in range(5):
             print(f'\trun #{run + 1}\n\t-------')
 
             ten_folds_dataset = lfw_pairs_dataset(subset='10fold')
